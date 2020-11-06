@@ -54,89 +54,93 @@ StatusCode CorrectECalBarrelSliWinCluster::initialize() {
   }
 
   // create control histograms
-  m_hEnergyPreAnyCorrections = new TH1F(
-      "energyPreAnyCorrections", "Energy of cluster before any correction", 3000, energyStart, energyEnd);
-  if (m_histSvc->regHist("/rec/energyPreAnyCorrections", m_hEnergyPreAnyCorrections).isFailure()) {
-    error() << "Couldn't register histogram" << endmsg;
-    return StatusCode::FAILURE;
-  }
-  m_hEnergyPostAllCorrections = new TH1F(
-      "energyPostAllCorrections", "Energy of cluster after all corrections", 3000, energyStart, energyEnd);
-  if (m_histSvc->regHist("/rec/energyPostAllCorrections", m_hEnergyPostAllCorrections).isFailure()) {
-    error() << "Couldn't register histogram" << endmsg;
-    return StatusCode::FAILURE;
-  }
-  m_hEnergyPostAllCorrectionsAndScaling = new TH1F(
-      "energyPostAllCorrectionsAndScaling", "Energy of cluster after all corrections and scaling", 3000, energyStart, energyEnd);
-  if (m_histSvc->regHist("/rec/energyPostAllCorrectionsAndScaling", m_hEnergyPostAllCorrectionsAndScaling).isFailure()) {
-    error() << "Couldn't register histogram" << endmsg;
-    return StatusCode::FAILURE;
-  }
-  m_hEnergyFractionInLayers = new TH1F(
-    "energyFractionInLayers", "Fraction of energy deposited in given layer", m_numLayers, 0.5, m_numLayers + 0.5);
-  if (m_histSvc->regHist("/rec/energyFractionInLayers", m_hEnergyFractionInLayers).isFailure()) {
-    error() << "Couldn't register histogram" << endmsg;
-    return StatusCode::FAILURE;
-  }
-  m_hPileupEnergy = new TH1F(
-      "pileupCorrectionEnergy", "Energy added to a cluster as a correction for correlated noise", 1000, -10, 10);
-  if (m_histSvc->regHist("/rec/pileupCorrectionEnergy", m_hPileupEnergy).isFailure()) {
-    error() << "Couldn't register histogram" << endmsg;
-    return StatusCode::FAILURE;
-  }
-  m_hUpstreamEnergy = new TH1F(
-    "upstreamCorrectionEnergy", "Energy added to a cluster as a correction for upstream material", 1000, -10, 10);
-  if (m_histSvc->regHist("/rec/upstreamCorrectionEnergy", m_hUpstreamEnergy).isFailure()) {
-    error() << "Couldn't register histogram" << endmsg;
-    return StatusCode::FAILURE;
-  }
-  m_hDiffEta = new TH1F("diffEta", "#eta resolution", 10 * ceil(2 * m_etaMax / m_dEta), - m_etaMax / 10., m_etaMax / 10.);
-  if (m_histSvc->regHist("/rec/diffEta", m_hDiffEta).isFailure()) {
-    error() << "Couldn't register histogram" << endmsg;
-    return StatusCode::FAILURE;
-  }
-  m_hDiffEtaResWeight = new TH1F("diffEtaResWeight", "#eta resolution", 10 * ceil(2 * m_etaMax / m_dEta), - m_etaMax / 10., m_etaMax / 10.);
-  if (m_histSvc->regHist("/rec/diffEtaResWeight", m_hDiffEtaResWeight).isFailure()) {
-    error() << "Couldn't register histogram" << endmsg;
-    return StatusCode::FAILURE;
-  }
-  m_hDiffEtaResWeight2point = new TH1F("diffEtaResWeight2point", "#eta resolution", 10 * ceil(2 * m_etaMax / m_dEta), - m_etaMax / 10., m_etaMax / 10.);
-  if (m_histSvc->regHist("/rec/diffEtaResWeight2point", m_hDiffEtaResWeight2point).isFailure()) {
-    error() << "Couldn't register histogram" << endmsg;
-    return StatusCode::FAILURE;
-  }
-  for (uint i = 0; i < m_numLayers; i++) {
-    m_hDiffEtaLayer.push_back(new TH1F(("diffEtaLayer"+std::to_string(i)).c_str(), ("#eta resolution for layer "+std::to_string(i)).c_str(),
-                                       10 * ceil(2 * m_etaMax / m_dEta), - m_etaMax / 10., m_etaMax / 10.));
-    if (m_histSvc->regHist("/rec/diffEta_layer" + std::to_string(i), m_hDiffEtaLayer.back()).isFailure()) {
+  if (m_makeHistos) {
+    m_hEnergyPreAnyCorrections = new TH1F(
+        "energyPreAnyCorrections", "Energy of cluster before any correction", 3000, energyStart, energyEnd);
+    if (m_histSvc->regHist("/rec/energyPreAnyCorrections", m_hEnergyPreAnyCorrections).isFailure()) {
+      error() << "Couldn't register histogram" << endmsg;
+      return StatusCode::FAILURE;
+    }
+    m_hEnergyPostAllCorrections = new TH1F(
+        "energyPostAllCorrections", "Energy of cluster after all corrections", 3000, energyStart, energyEnd);
+    if (m_histSvc->regHist("/rec/energyPostAllCorrections", m_hEnergyPostAllCorrections).isFailure()) {
+      error() << "Couldn't register histogram" << endmsg;
+      return StatusCode::FAILURE;
+    }
+    m_hEnergyPostAllCorrectionsAndScaling = new TH1F(
+        "energyPostAllCorrectionsAndScaling", "Energy of cluster after all corrections and scaling", 3000, energyStart, energyEnd);
+    if (m_histSvc->regHist("/rec/energyPostAllCorrectionsAndScaling", m_hEnergyPostAllCorrectionsAndScaling).isFailure()) {
+      error() << "Couldn't register histogram" << endmsg;
+      return StatusCode::FAILURE;
+    }
+    m_hEnergyFractionInLayers = new TH1F(
+      "energyFractionInLayers", "Fraction of energy deposited in given layer", m_numLayers, 0.5, m_numLayers + 0.5);
+    if (m_histSvc->regHist("/rec/energyFractionInLayers", m_hEnergyFractionInLayers).isFailure()) {
+      error() << "Couldn't register histogram" << endmsg;
+      return StatusCode::FAILURE;
+    }
+    m_hPileupEnergy = new TH1F(
+        "pileupCorrectionEnergy", "Energy added to a cluster as a correction for correlated noise", 1000, -10, 10);
+    if (m_histSvc->regHist("/rec/pileupCorrectionEnergy", m_hPileupEnergy).isFailure()) {
+      error() << "Couldn't register histogram" << endmsg;
+      return StatusCode::FAILURE;
+    }
+    m_hUpstreamEnergy = new TH1F(
+      "upstreamCorrectionEnergy", "Energy added to a cluster as a correction for upstream material", 1000, -10, 10);
+    if (m_histSvc->regHist("/rec/upstreamCorrectionEnergy", m_hUpstreamEnergy).isFailure()) {
+      error() << "Couldn't register histogram" << endmsg;
+      return StatusCode::FAILURE;
+    }
+    m_hDiffEta = new TH1F("diffEta", "#eta resolution", 10 * ceil(2 * m_etaMax / m_dEta), - m_etaMax / 10., m_etaMax / 10.);
+    if (m_histSvc->regHist("/rec/diffEta", m_hDiffEta).isFailure()) {
+      error() << "Couldn't register histogram" << endmsg;
+      return StatusCode::FAILURE;
+    }
+    m_hDiffEtaResWeight = new TH1F("diffEtaResWeight", "#eta resolution", 10 * ceil(2 * m_etaMax / m_dEta), - m_etaMax / 10., m_etaMax / 10.);
+    if (m_histSvc->regHist("/rec/diffEtaResWeight", m_hDiffEtaResWeight).isFailure()) {
+      error() << "Couldn't register histogram" << endmsg;
+      return StatusCode::FAILURE;
+    }
+    m_hDiffEtaResWeight2point = new TH1F("diffEtaResWeight2point", "#eta resolution", 10 * ceil(2 * m_etaMax / m_dEta), - m_etaMax / 10., m_etaMax / 10.);
+    if (m_histSvc->regHist("/rec/diffEtaResWeight2point", m_hDiffEtaResWeight2point).isFailure()) {
+      error() << "Couldn't register histogram" << endmsg;
+      return StatusCode::FAILURE;
+    }
+    for (uint i = 0; i < m_numLayers; i++) {
+      m_hDiffEtaLayer.push_back(new TH1F(("diffEtaLayer"+std::to_string(i)).c_str(), ("#eta resolution for layer "+std::to_string(i)).c_str(),
+                                         10 * ceil(2 * m_etaMax / m_dEta), - m_etaMax / 10., m_etaMax / 10.));
+      if (m_histSvc->regHist("/rec/diffEta_layer" + std::to_string(i), m_hDiffEtaLayer.back()).isFailure()) {
+        error() << "Couldn't register histogram" << endmsg;
+        return StatusCode::FAILURE;
+      }
+    }
+    m_hEta = new TH1F("eta", "#eta", 1000, - m_etaMax, m_etaMax);
+    if (m_histSvc->regHist("/rec/eta", m_hEta).isFailure()) {
+      error() << "Couldn't register histogram" << endmsg;
+      return StatusCode::FAILURE;
+    }
+    m_hDiffPhi = new TH1F("diffPhi", "#varphi resolution", 10 * ceil(2 * m_phiMax / m_dPhi), - m_phiMax / 10., m_phiMax / 10.);
+    if (m_histSvc->regHist("/rec/diffPhi", m_hDiffPhi).isFailure()) {
+      error() << "Couldn't register histogram" << endmsg;
+      return StatusCode::FAILURE;
+    }
+    m_hPhi = new TH1F("phi", "#varphi", 1000, - m_phiMax, m_phiMax);
+    if (m_histSvc->regHist("/rec/phi", m_hPhi).isFailure()) {
+      error() << "Couldn't register histogram" << endmsg;
+      return StatusCode::FAILURE;
+    }
+    m_hNumCells = new TH1F("numCells", "number of cells", 2000, -0.5, 1999.5);
+    if (m_histSvc->regHist("/rec/numCells", m_hNumCells).isFailure()) {
       error() << "Couldn't register histogram" << endmsg;
       return StatusCode::FAILURE;
     }
   }
-  m_hEta = new TH1F("eta", "#eta", 1000, - m_etaMax, m_etaMax);
-  if (m_histSvc->regHist("/rec/eta", m_hEta).isFailure()) {
-    error() << "Couldn't register histogram" << endmsg;
-    return StatusCode::FAILURE;
-  }
-  m_hDiffPhi = new TH1F("diffPhi", "#varphi resolution", 10 * ceil(2 * m_phiMax / m_dPhi), - m_phiMax / 10., m_phiMax / 10.);
-  if (m_histSvc->regHist("/rec/diffPhi", m_hDiffPhi).isFailure()) {
-    error() << "Couldn't register histogram" << endmsg;
-    return StatusCode::FAILURE;
-  }
-  m_hPhi = new TH1F("phi", "#varphi", 1000, - m_phiMax, m_phiMax);
-  if (m_histSvc->regHist("/rec/phi", m_hPhi).isFailure()) {
-    error() << "Couldn't register histogram" << endmsg;
-    return StatusCode::FAILURE;
-  }
-  m_hNumCells = new TH1F("numCells", "number of cells", 2000, -0.5, 1999.5);
-  if (m_histSvc->regHist("/rec/numCells", m_hNumCells).isFailure()) {
-    error() << "Couldn't register histogram" << endmsg;
-    return StatusCode::FAILURE;
-  }
+
   if (m_etaRecalcLayerWeights.size() < m_numLayers) {
     error() << "m_etaRecalcLayerWeights size is smaller than numLayers." << endmsg;
     return StatusCode::FAILURE;
   }
+
   for (uint iSys = 0; iSys < m_systemId.size(); iSys++) {
     // check if readouts exist
     if (m_geoSvc->lcdd()->readouts().find(m_readoutName[iSys]) == m_geoSvc->lcdd()->readouts().end()) {
@@ -364,7 +368,9 @@ StatusCode CorrectECalBarrelSliWinCluster::execute() {
       noise = m_constPileupNoise * m_gauss.shoot() * std::sqrt(static_cast<int>(m_mu));
     }
     newCluster.core().energy += noise;
-    m_hPileupEnergy->Fill(noise);
+    if (m_makeHistos) {
+      m_hPileupEnergy->Fill(noise);
+    }
 
     // 3. Correct for energy upstream
     // correct for presampler based on energy in the first layer layer:
@@ -387,29 +393,36 @@ StatusCode CorrectECalBarrelSliWinCluster::execute() {
     double presamplerShift = P00 + P01 * cluster.core().energy;
     double presamplerScale = P10 + P11 * sqrt(cluster.core().energy);
     double energyFront = presamplerShift + presamplerScale * sumEnFirstLayer * m_samplingFraction[0];
-    m_hUpstreamEnergy->Fill(energyFront);
+    if (m_makeHistos) {
+      m_hUpstreamEnergy->Fill(energyFront);
+    }
     newCluster.core().energy += energyFront;
 
     // Fill histograms
-    m_hEnergyPreAnyCorrections->Fill(oldEnergy);
-    m_hEnergyPostAllCorrections->Fill(newCluster.core().energy);
-    m_hEnergyPostAllCorrectionsAndScaling->Fill(newCluster.core().energy / m_response);
+    if (m_makeHistos) {
+      m_hEnergyPreAnyCorrections->Fill(oldEnergy);
+      m_hEnergyPostAllCorrections->Fill(newCluster.core().energy);
+      m_hEnergyPostAllCorrectionsAndScaling->Fill(newCluster.core().energy / m_response);
+    }
 
     // Position resolution
-    m_hEta->Fill(newEta);
-    m_hPhi->Fill(phi);
+    if (m_makeHistos) {
+      m_hEta->Fill(newEta);
+      m_hPhi->Fill(phi);
+      m_hNumCells->Fill(numCells);
+    }
     verbose() << " energy " << energy << "   numCells = " << numCells << " old energy = " << oldEnergy <<
       " newEta " << newEta << "   phi = " << phi << " theta = " << 2 * atan( exp( - newEta ) ) << endmsg;
-    m_hNumCells->Fill(numCells);
     // Fill histograms for single particle events
-    if (particle->size() == 1) {
+    if (particle->size() == 1 && m_makeHistos) {
       m_hDiffEta->Fill(newEta - etaVertex);
       m_hDiffEtaResWeight->Fill(newEtaErrorRes - etaVertex);
       m_hDiffEtaResWeight2point->Fill(newEtaErrorRes2point - etaVertex);
       for(uint iLayer = 0; iLayer < m_numLayers; iLayer++) {
         m_hDiffEtaLayer[iLayer]->Fill(sumEtaLayer[iLayer] - etaVertex);
-        if (energy > 0)
+        if (energy > 0 && m_makeHistos) {
           m_hEnergyFractionInLayers->Fill(iLayer+1, sumEnLayer[iLayer] / energy);
+        }
       }
       m_hDiffPhi->Fill(phi - phiVertex);
     }

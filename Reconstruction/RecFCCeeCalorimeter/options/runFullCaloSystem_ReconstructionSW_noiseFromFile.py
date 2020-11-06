@@ -5,7 +5,8 @@ ecalBarrelCellsName = "ECalBarrelCells"
 ecalBarrelReadoutName = "ECalBarrelPhiEta"
 
 # Number of events
-num_events = -1
+# num_events = -1
+num_events = 10
 
 from Gaudi.Configuration import *
 from Configurables import ApplicationMgr, FCCDataSvc, PodioOutput
@@ -18,7 +19,7 @@ podioevent.inputs=glob.glob("output_fullCalo_SimAndDigi_*.root")
 from Configurables import PodioInput
 podioinput = PodioInput("PodioReader",
                         collections = [ecalBarrelCellsName,
-                                       "GenParticles",
+                                       "GenParticles", "GenVertices"
                                        ])
 
 
@@ -113,6 +114,24 @@ createClusters = CreateCaloClustersSlidingWindow("CreateClusters",
                                                  energyThreshold = threshold)
 createClusters.clusters.Path = "CaloClusters"
 
+
+# Correct clusters
+from Configurables import CorrectECalBarrelSliWinCluster
+correctClusters = CorrectECalBarrelSliWinCluster("corr",
+                                                 clusters="CaloClusters",
+                                                 correctedClusters="CaloClustersCorrected",
+                                                 particle="GenParticles",
+                                                 vertex="GenVertices",
+                                                 nPhiOptimFinal=[7]*8,
+                                                 nEtaOptimFinal=[19]*8,
+                                                 noiseFileName="http://fccsw.web.cern.ch/fccsw/testsamples/elecNoise_pileup_cluster_mu200_700files.root")
+THistSvc().Output = ["rec DATAFILE='clusterCorrections_histograms.root' TYP='ROOT' OPT='RECREATE'"]
+THistSvc().PrintAll = True
+THistSvc().AutoSave = True
+THistSvc().AutoFlush = False
+THistSvc().OutputLevel = INFO
+
+
 import uuid
 out = PodioOutput("out", filename="output_allCalo_reco_noise_" + uuid.uuid4().hex + ".root")
 out.outputCommands = ["keep *"]
@@ -131,6 +150,7 @@ ApplicationMgr(
               createemptycells,
               createEcalBarrelCells,
               createClusters,
+              correctClusters,
               out
               ],
     EvtSel = 'NONE',

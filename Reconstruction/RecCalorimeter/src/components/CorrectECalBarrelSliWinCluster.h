@@ -208,7 +208,7 @@ private:
   /// Size of the window in phi for the final cluster building, optimised for each layer  (in units of cell size)
   /// If empty use same size for each layer, as in *nPhiFinal*
   Gaudi::Property<std::vector<int>> m_nPhiFinal{this, "nPhiOptimFinal", {}};
-  // Recalculate to half size N (window size = 2*N+1)
+  /// Recalculate to half size N (window size = 2*N+1)
   std::vector<int> m_halfPhiFin;
   /// Size of the window in eta for the final cluster building, optimised for each layer  (in units of cell size)
   /// If empty use same size for each layer, as in *nEtaFinal*
@@ -219,6 +219,9 @@ private:
   Gaudi::Property<bool> m_ellipseFinalCluster{this, "ellipse", false};
   /// Use this value of pileup noise (to overwrite the value read from file and calculated based on num of cells)
   Gaudi::Property<double> m_constPileupNoise{this, "constPileupNoise", 0};
+
+  /// Enable or disable control histograms
+  Gaudi::Property<bool> m_makeHistos{this, "makeHistos", false};
 };
 
 #endif /* RECCALORIMETER_CORRECTCLUSTER_H */

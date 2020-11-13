@@ -222,6 +222,13 @@ private:
 
   /// Enable or disable control histograms
   Gaudi::Property<bool> m_makeHistos{this, "makeHistos", false};
+
+  /// Enable or disable pseudorapidity correction
+  Gaudi::Property<bool> m_doEtaCorr{this, "doEtaCorr", true};
+  /// Enable or disable pile-up correction
+  Gaudi::Property<bool> m_doPileUpCorr{this, "doPileUpCorr", true};
+  /// Enable or disable upstream correction
+  Gaudi::Property<bool> m_doUpstreamCorr{this, "doUpstreamCorr", true};
 };
 
 #endif /* RECCALORIMETER_CORRECTCLUSTER_H */

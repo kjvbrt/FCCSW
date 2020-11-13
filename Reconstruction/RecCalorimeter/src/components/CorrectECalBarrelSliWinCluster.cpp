@@ -25,6 +25,9 @@
 
 DECLARE_COMPONENT(CorrectECalBarrelSliWinCluster)
 
+double GetEnergyInFirstLayer(fcc::CaloCluster& cluster);
+
+
 CorrectECalBarrelSliWinCluster::CorrectECalBarrelSliWinCluster(const std::string& name, ISvcLocator* svcLoc)
     : GaudiAlgorithm(name, svcLoc),
       m_histSvc("THistSvc", "CorrectECalBarrelSliWinCluster"),
@@ -292,140 +295,159 @@ StatusCode CorrectECalBarrelSliWinCluster::execute() {
     newCluster.core().energy = energy;
 
     // 1. Correct eta position with log-weighting
-    double sumEnFirstLayer = 0;
-    // get current pseudorapidity
-    std::vector<double> sumEnLayer;
-    std::vector<double> sumEnLayerSorted;
-    std::vector<double> sumEtaLayer;
-    std::vector<double> sumWeightLayer;
-    sumEnLayer.assign(m_numLayers, 0);
-    sumEnLayerSorted.assign(m_numLayers, 0);
-    sumEtaLayer.assign(m_numLayers, 0);
-    sumWeightLayer.assign(m_numLayers, 0);
-    // first check the energy deposited in each layer
-    for (auto cell = newCluster.hits_begin(); cell != newCluster.hits_end(); cell++) {
-      dd4hep::DDSegmentation::CellID cID = cell->core().cellId;
-      uint layer = m_decoder[systemId]->get(cID, m_layerFieldName) + m_firstLayerId;
-      sumEnLayer[layer] += cell->core().energy;
-    }
-    // sort energy to check value of 2nd highest, 3rd highest etc
-    for (uint iLayer = 0; iLayer < m_numLayers; iLayer++) {
-      sumEnLayerSorted[iLayer] = sumEnLayer[iLayer];
-    }
-    std::sort(sumEnLayerSorted.begin(),sumEnLayerSorted.end(),std::greater<double>());
-    sumEnFirstLayer = sumEnLayer[0];
-    // repeat but calculating eta barycentre in each layer
-    for (auto cell = newCluster.hits_begin(); cell != newCluster.hits_end(); cell++) {
-      if (m_segmentationMulti[systemId] != nullptr) {
-        segmentation = dynamic_cast<const dd4hep::DDSegmentation::FCCSWGridPhiEta*>(&m_segmentationMulti[systemId]->subsegmentation(cell->core().cellId));
+    if (m_doEtaCorr) {
+      // get current pseudorapidity
+      std::vector<double> sumEnLayer;
+      std::vector<double> sumEnLayerSorted;
+      std::vector<double> sumEtaLayer;
+      std::vector<double> sumWeightLayer;
+      sumEnLayer.assign(m_numLayers, 0);
+      sumEnLayerSorted.assign(m_numLayers, 0);
+      sumEtaLayer.assign(m_numLayers, 0);
+      sumWeightLayer.assign(m_numLayers, 0);
+      // first check the energy deposited in each layer
+      for (auto cell = newCluster.hits_begin(); cell != newCluster.hits_end(); cell++) {
+        dd4hep::DDSegmentation::CellID cID = cell->core().cellId;
+        uint layer = m_decoder[systemId]->get(cID, m_layerFieldName) + m_firstLayerId;
+        sumEnLayer[layer] += cell->core().energy;
       }
-      dd4hep::DDSegmentation::CellID cID = cell->core().cellId;
-      uint layer = m_decoder[systemId]->get(cID, m_layerFieldName) + m_firstLayerId;
-      double weightLog = std::max(0., m_etaRecalcLayerWeights[layer] + log(cell->core().energy / sumEnLayer[layer]));
-      double eta = segmentation->eta(cell->core().cellId);
-      sumEtaLayer[layer] += (weightLog * eta);
-      sumWeightLayer[layer] += weightLog;
-    }
-    // calculate eta position weighting with energy deposited in layer
-    // this energy is a good estimator of 1/sigma^2 of (eta_barycentre-eta_MC) distribution
-    double layerWeight = 0;
-    double sumLayerWeight = 0;
-    double sumLayerWeight2point = 0;
-    double newEta = 0;
-    double newEtaErrorRes = 0;
-    double newEtaErrorRes2point = 0;
-    for (uint iLayer = 0; iLayer < m_numLayers; iLayer++) {
-      if (sumWeightLayer[iLayer] > 1e-10) {
-        sumEtaLayer[iLayer] /= sumWeightLayer[iLayer];
-        newEta += sumEtaLayer[iLayer] * sumEnLayer[iLayer];
-        layerWeight = 1. / (pow(m_etaLayerResolutionSampling[iLayer], 2) / energy +  pow(m_etaLayerResolutionConst[iLayer], 2));
-        sumLayerWeight += layerWeight;
-        newEtaErrorRes += sumEtaLayer[iLayer] * layerWeight;
-        if (iLayer == 1 || iLayer == 2) {
-          newEtaErrorRes2point += sumEtaLayer[iLayer] * layerWeight;
-          sumLayerWeight2point += layerWeight;
+      // sort energy to check value of 2nd highest, 3rd highest etc
+      for (uint iLayer = 0; iLayer < m_numLayers; iLayer++) {
+        sumEnLayerSorted[iLayer] = sumEnLayer[iLayer];
+      }
+      std::sort(sumEnLayerSorted.begin(),sumEnLayerSorted.end(),std::greater<double>());
+      // repeat but calculating eta barycentre in each layer
+      for (auto cell = newCluster.hits_begin(); cell != newCluster.hits_end(); cell++) {
+        if (m_segmentationMulti[systemId] != nullptr) {
+          segmentation = dynamic_cast<const dd4hep::DDSegmentation::FCCSWGridPhiEta*>(&m_segmentationMulti[systemId]->subsegmentation(cell->core().cellId));
+        }
+        dd4hep::DDSegmentation::CellID cID = cell->core().cellId;
+        uint layer = m_decoder[systemId]->get(cID, m_layerFieldName) + m_firstLayerId;
+        double weightLog = std::max(0., m_etaRecalcLayerWeights[layer] + log(cell->core().energy / sumEnLayer[layer]));
+        double eta = segmentation->eta(cell->core().cellId);
+        sumEtaLayer[layer] += (weightLog * eta);
+        sumWeightLayer[layer] += weightLog;
+      }
+      // calculate eta position weighting with energy deposited in layer
+      // this energy is a good estimator of 1/sigma^2 of (eta_barycentre-eta_MC) distribution
+      double sumLayerWeight = 0;
+      double sumLayerWeight2point = 0;
+      double newEta = 0;
+      double newEtaErrorRes = 0;
+      double newEtaErrorRes2point = 0;
+      for (uint iLayer = 0; iLayer < m_numLayers; iLayer++) {
+        if (sumWeightLayer[iLayer] > 1e-10) {
+          sumEtaLayer[iLayer] /= sumWeightLayer[iLayer];
+          newEta += sumEtaLayer[iLayer] * sumEnLayer[iLayer];
+          double layerWeight = 1. / (pow(m_etaLayerResolutionSampling[iLayer], 2) / energy +  pow(m_etaLayerResolutionConst[iLayer], 2));
+          sumLayerWeight += layerWeight;
+          newEtaErrorRes += sumEtaLayer[iLayer] * layerWeight;
+          if (iLayer == 1 || iLayer == 2) {
+            newEtaErrorRes2point += sumEtaLayer[iLayer] * layerWeight;
+            sumLayerWeight2point += layerWeight;
+          }
         }
       }
-    }
-    newEta /= energy;
-    newEtaErrorRes /= sumLayerWeight;
-    newEtaErrorRes2point /= sumLayerWeight2point;
-    // alter Cartesian position of a cluster using new eta position
-    double radius = pos.Perp();
-    double phi = pos.Phi();
-    newCluster.core().position.x = radius * cos(phi);
-    newCluster.core().position.y = radius * sin(phi);
-    newCluster.core().position.z = radius * sinh(newEta);
+      newEta /= energy;
+      newEtaErrorRes /= sumLayerWeight;
+      newEtaErrorRes2point /= sumLayerWeight2point;
+      // alter Cartesian position of a cluster using new eta position
+      double radius = pos.Perp();
+      double phi = pos.Phi();
+      newCluster.core().position.x = radius * cos(phi);
+      newCluster.core().position.y = radius * sin(phi);
+      newCluster.core().position.z = radius * sinh(newEta);
 
+      debug() << "new eta: " << newEta << endmsg;
+    }
+
+    /*
     // 2. Correct energy for pileup noise
-    uint numCells = newCluster.hits_size();
-    double noise = 0;
-    if (m_constPileupNoise == 0) {
-      noise = getNoiseConstantPerCluster(newEta, numCells) * m_gauss.shoot() * std::sqrt(static_cast<int>(m_mu));
-      verbose() << " NUM CELLS = " << numCells << "   cluster noise const = " << getNoiseConstantPerCluster(newEta, numCells)
-                << " scaled to PU " << m_mu<< "  = " << getNoiseConstantPerCluster(newEta, numCells)* std::sqrt(static_cast<int>(m_mu)) << endmsg;
-    } else {
-      noise = m_constPileupNoise * m_gauss.shoot() * std::sqrt(static_cast<int>(m_mu));
-    }
-    newCluster.core().energy += noise;
-    if (m_makeHistos) {
-      m_hPileupEnergy->Fill(noise);
-    }
-
-    // 3. Correct for energy upstream
-    // correct for presampler based on energy in the first layer layer:
-    // check eta of the cluster and get correction parameters:
-    double P00 = 0, P01 = 0, P10 = 0, P11 = 0;
-    for (uint iEta = 0; iEta < m_etaBorders.size(); iEta++) {
-      if (fabs(newEta) < m_etaBorders[iEta]) {
-        P00 = m_presamplerShiftP0[iEta];
-        P01 = m_presamplerShiftP1[iEta];
-        P10 = m_presamplerScaleP0[iEta];
-        P11 = m_presamplerScaleP1[iEta];
-        break;
+    if (m_doPileUpCorr) {
+      uint numCells = newCluster.hits_size();
+      double noise = 0;
+      if (m_constPileupNoise == 0) {
+        noise = getNoiseConstantPerCluster(newEta, numCells) * m_gauss.shoot() * std::sqrt(static_cast<int>(m_mu));
+        verbose() << " NUM CELLS = " << numCells << "   cluster noise const = " << getNoiseConstantPerCluster(newEta, numCells)
+                  << " scaled to PU " << m_mu<< "  = " << getNoiseConstantPerCluster(newEta, numCells)* std::sqrt(static_cast<int>(m_mu)) << endmsg;
+      } else {
+        noise = m_constPileupNoise * m_gauss.shoot() * std::sqrt(static_cast<int>(m_mu));
+      }
+      newCluster.core().energy += noise;
+      if (m_makeHistos) {
+        m_hPileupEnergy->Fill(noise);
       }
     }
-    // if eta is larger than the last available eta values, take the last known parameters
-    if (fabs(newEta) > m_etaBorders.back()) {
-      warning() << "cluster eta = " << newEta << " is larger than last defined eta values." << endmsg;
-      //return StatusCode::FAILURE;
+    */
+
+    // 3. Correct for energy upstream
+    if (m_doUpstreamCorr) {
+      // correct for presampler based on energy in the first layer layer:
+      // check eta of the cluster and get correction parameters:
+      const double clusterR = sqrt(pow(newCluster.core().position.x, 2) +
+                                   pow(newCluster.core().position.y, 2));
+      const double clusterEta = asinh(newCluster.core().position.z / clusterR);
+      debug() << "cluster eta: " << clusterEta << endmsg;
+
+      double firstLayerEnergy = 0;
+      // first check the energy deposited in each layer
+      double P00 = 0, P01 = 0, P10 = 0, P11 = 0;
+      for (uint iEta = 0; iEta < m_etaBorders.size(); iEta++) {
+        if (fabs(clusterEta) < m_etaBorders[iEta]) {
+          P00 = m_presamplerShiftP0[iEta];
+          P01 = m_presamplerShiftP1[iEta];
+          P10 = m_presamplerScaleP0[iEta];
+          P11 = m_presamplerScaleP1[iEta];
+          break;
+        }
+      }
+      // if eta is larger than the last available eta values, take the last known parameters
+      if (fabs(clusterEta) > m_etaBorders.back()) {
+        warning() << "cluster eta = " << clusterEta << " is larger than last defined eta values." << endmsg;
+        //return StatusCode::FAILURE;
+      }
+      double presamplerShift = P00 + P01 * cluster.core().energy;
+      double presamplerScale = P10 + P11 * sqrt(cluster.core().energy);
+      double energyFront = presamplerShift + presamplerScale * sumEnLayer[0] * m_samplingFraction[0];
+      if (m_makeHistos) {
+        m_hUpstreamEnergy->Fill(energyFront);
+      }
+      newCluster.core().energy += energyFront;
     }
-    double presamplerShift = P00 + P01 * cluster.core().energy;
-    double presamplerScale = P10 + P11 * sqrt(cluster.core().energy);
-    double energyFront = presamplerShift + presamplerScale * sumEnFirstLayer * m_samplingFraction[0];
-    if (m_makeHistos) {
-      m_hUpstreamEnergy->Fill(energyFront);
-    }
-    newCluster.core().energy += energyFront;
 
     // Fill histograms
     if (m_makeHistos) {
       m_hEnergyPreAnyCorrections->Fill(oldEnergy);
       m_hEnergyPostAllCorrections->Fill(newCluster.core().energy);
       m_hEnergyPostAllCorrectionsAndScaling->Fill(newCluster.core().energy / m_response);
-    }
 
-    // Position resolution
-    if (m_makeHistos) {
-      m_hEta->Fill(newEta);
-      m_hPhi->Fill(phi);
+      // Position resolution
+      // m_hEta->Fill(newEta);
+      // m_hPhi->Fill(phi);
+
       m_hNumCells->Fill(numCells);
-    }
-    verbose() << " energy " << energy << "   numCells = " << numCells << " old energy = " << oldEnergy <<
-      " newEta " << newEta << "   phi = " << phi << " theta = " << 2 * atan( exp( - newEta ) ) << endmsg;
-    // Fill histograms for single particle events
-    if (particle->size() == 1 && m_makeHistos) {
-      m_hDiffEta->Fill(newEta - etaVertex);
-      m_hDiffEtaResWeight->Fill(newEtaErrorRes - etaVertex);
-      m_hDiffEtaResWeight2point->Fill(newEtaErrorRes2point - etaVertex);
-      for(uint iLayer = 0; iLayer < m_numLayers; iLayer++) {
-        m_hDiffEtaLayer[iLayer]->Fill(sumEtaLayer[iLayer] - etaVertex);
-        if (energy > 0 && m_makeHistos) {
-          m_hEnergyFractionInLayers->Fill(iLayer+1, sumEnLayer[iLayer] / energy);
+
+      // Fill histograms for single particle events
+      if (particle->size() == 1) {
+        // m_hDiffEta->Fill(newEta - etaVertex);
+        // m_hDiffEtaResWeight->Fill(newEtaErrorRes - etaVertex);
+        // m_hDiffEtaResWeight2point->Fill(newEtaErrorRes2point - etaVertex);
+        for(uint iLayer = 0; iLayer < m_numLayers; iLayer++) {
+          m_hDiffEtaLayer[iLayer]->Fill(sumEtaLayer[iLayer] - etaVertex);
+          if (energy > 0) {
+            m_hEnergyFractionInLayers->Fill(iLayer+1, sumEnLayer[iLayer] / energy);
+          }
         }
+        // m_hDiffPhi->Fill(phi - phiVertex);
       }
-      m_hDiffPhi->Fill(phi - phiVertex);
     }
+    verbose() << " energy " << energy
+              << "   numCells = " << numCells
+              << " old energy = " << oldEnergy
+ //              << " newEta " << newEta
+ //              << "   phi = " << phi
+ //              << " theta = " << 2 * atan( exp( - newEta ) )
+              << endmsg;
   }
 
   return StatusCode::SUCCESS;
@@ -508,4 +530,20 @@ unsigned int CorrectECalBarrelSliWinCluster::phiNeighbour(int aIPhi, int aMaxPhi
     return aIPhi % aMaxPhi;
   }
   return aIPhi;
+}
+
+
+double GetEnergyInFirstLayer(fcc::CaloCluster& cluster) {
+  double layerEnergy = 0;
+
+  for (auto cell = cluster.hits_begin(); cell != cluster.hits_end(); ++cell) {
+    dd4hep::DDSegmentation::CellID cID = cell->core().cellId;
+    size_t layer = m_firstLayerId +
+                   m_decoder[systemId]->get(cID, m_layerFieldName);
+    if (layer = 0) {
+      layerEnergy += cell->core().energy;
+    }
+  }
+
+  return layerEnergy;
 }

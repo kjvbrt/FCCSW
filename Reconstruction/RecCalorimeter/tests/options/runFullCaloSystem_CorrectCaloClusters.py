@@ -82,22 +82,18 @@ createClusters = CreateCaloClustersSlidingWindow("CreateClusters",
 createClusters.clusters.Path = "CaloClusters"
 createClusters.clusterCells.Path = "CaloClusterCells"
 
-# Correct clusters
-from Configurables import CorrectECalBarrelSliWinCluster
-corrClusters = CorrCaloSliWinCluster("corrClusters",
-                                     clusters="CaloClusters",
-                                     correctedClusters="CaloClustersCorrected",
-                                     particle = "GenParticles",
-                                     vertex = "GenVertices",
-                                     nPhiOptimFinal = [7]*8,
-                                     nEtaOptimFinal = [19]*8,
-                                     noiseFileName = "http://fccsw.web.cern.ch/fccsw/testsamples/elecNoise_pileup_cluster_mu200_700files.root")
 
-THistSvc().Output = ["rec DATAFILE='clusterCorrections_histograms.root' TYP='ROOT' OPT='RECREATE'"]
-THistSvc().PrintAll=True
-THistSvc().AutoSave=True
-THistSvc().AutoFlush=False
-THistSvc().OutputLevel=INFO
+# Correct clusters
+from Configurables import CorrectCaloClusters
+corrClusters = CorrectCaloClusters("corrClusters",
+                                   inClusters = "CaloClusters",
+                                   outClusters = "CaloClustersCorrected",
+                                   particle = "GenParticles",
+                                   vertex = "GenVertices",
+                                   nPhiOptimFinal = [7]*8,
+                                   nEtaOptimFinal = [19]*8,
+                                   noiseFileName = "http://fccsw.web.cern.ch/fccsw/testsamples/elecNoise_pileup_cluster_mu200_700files.root")
+
 
 #CPU information
 from Configurables import AuditorSvc, ChronoAuditor

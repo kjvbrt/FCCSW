@@ -77,15 +77,15 @@ gaudi_add_test(reconstructionFullCaloSystemWithNoise
                 FRAMEWORK tests/options/runFullCaloSystem_ReconstructionSW_noiseFromFile.py
                 PASSREGEX "Segmentation cells  \\(Nphi, Neta, minEta\\): \\[704, 335, 1\\]")
 
-gaudi_add_test(correctionFullCaloSystemOld
+gaudi_add_test(reconstructionFullCaloSystemWithNoiseCaloCorr
                 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
                 DEPENDS reconstructionFullCaloSystem
-                FRAMEWORK tests/options/runFullCaloSystem_CorrectECalBarrelSliWinClusters.py)
+                FRAMEWORK tests/options/runFullCaloSystem_CorrectCaloClusters.py)
 
 gaudi_add_test(correctionFullCaloSystem
                 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
                 DEPENDS reconstructionFullCaloSystem
-                FRAMEWORK tests/options/runFullCaloSystem_CorrectCaloSliWinClusters.py)
+                FRAMEWORK tests/options/runFullCaloSystem_CorrectECalBarrelSliWinClusters.py)
 
 gaudi_add_test(estimatePileup
                 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}

@@ -119,11 +119,13 @@ createClusters.clusters.Path = "CaloClusters"
 createClusters.clusterCells.Path = "CaloClusterCells"
 
 
-# Correct clusters
-from Configurables import CorrCaloSliWinCluster
-corrClusters = CorrCaloSliWinCluster("corrClusters",
-                                     clusters="CaloClusters",
-                                     correctedClusters="CaloClustersCorrected")
+# Correct calorimeter clusters
+from Configurables import CorrectCaloClusters
+corrClusters = CorrectCaloClusters("corrClusters",
+                                   inClusters="CaloClusters",
+                                   outClusters="CaloClustersCorrected",
+                                   )
+#                                   OutputLevel=VERBOSE)
 
 
 import uuid

@@ -5,8 +5,7 @@ ecalBarrelCellsName = "ECalBarrelCells"
 ecalBarrelReadoutName = "ECalBarrelPhiEta"
 
 # Number of events
-# num_events = -1
-num_events = 10
+num_events = -1
 
 from Gaudi.Configuration import *
 from Configurables import ApplicationMgr, FCCDataSvc, PodioOutput
@@ -112,7 +111,6 @@ createClusters = CreateCaloClustersSlidingWindow("CreateClusters",
                                                  nEtaDuplicates = dupE, nPhiDuplicates = dupP,
                                                  nEtaFinal = finE, nPhiFinal = finP,
                                                  energyThreshold = threshold,
-                                                 # ellipse = True,
                                                  attachCells = True
                                                  )
 createClusters.clusters.Path = "CaloClusters"
@@ -123,16 +121,14 @@ createClusters.clusterCells.Path = "CaloClusterCells"
 from Configurables import CorrectCaloClusters
 corrClusters = CorrectCaloClusters("corrClusters",
                                    inClusters="CaloClusters",
-                                   outClusters="CaloClustersCorrected",
-                                   )
-#                                   OutputLevel=VERBOSE)
+                                   outClusters="CaloClustersCorrected")
 
 
 import uuid
 podioOutput = PodioOutput("podioOutput",
                           filename="output_allCalo_reco_noise_" + \
                                    uuid.uuid4().hex + ".root")
-podioOutput.outputCommands = ["drop *"]
+podioOutput.outputCommands = ["keep *"]
 
 #CPU information
 from Configurables import AuditorSvc, ChronoAuditor

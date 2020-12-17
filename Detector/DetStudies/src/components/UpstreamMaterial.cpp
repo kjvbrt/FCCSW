@@ -51,10 +51,11 @@ StatusCode UpstreamMaterial::initialize() {
       error() << "Couldn't register histogram" << endmsg;
       return StatusCode::FAILURE;
     }
-    m_upstreamEnergyCellEnergy.push_back(
+
+    m_upstreamEnergyCellEnergy.emplace_back(
         new TH2F(("upstreamEnergy_presamplerEnergy" + std::to_string(i)).c_str(),
-                 ("Upstream energy vs energy deposited in layer " + std::to_string(i)).c_str(), 4000, 0, m_energy, 4000,
-                 0, m_energy));
+                 ("Upstream energy vs energy deposited in layer " + std::to_string(i)).c_str(),
+                 2000, 0., (i == 0 ? 0.1 : 0.7) * m_energy, 2000, 0., std::log(m_energy)));
     if (m_histSvc
             ->regHist("/det/upstreamEnergy_presamplerEnergy" + std::to_string(i), m_upstreamEnergyCellEnergy.back())
             .isFailure()) {
@@ -62,6 +63,23 @@ StatusCode UpstreamMaterial::initialize() {
       return StatusCode::FAILURE;
     }
   }
+
+  m_hSumEinLayers = new TH1F("hSumEinLayers",
+                             "Sum of energy deposited in all layers;E [GeV];N_{evt}",
+                             400, 0.7*m_energy, 1.3*m_energy);
+  if (m_histSvc->regHist("/det/sumEinLayers", m_hSumEinLayers).isFailure()) {
+    error() << "Couldn't register histogram: hSumEinLayers" << endmsg;
+    return StatusCode::FAILURE;
+  }
+
+  m_hEinCryo = new TH1F("hEinCryo",
+                        "Energy deposited in cryostat;E [GeV];N_{evt}",
+                        200, 0., 0.2*m_energy);
+  if (m_histSvc->regHist("/det/EinCryo", m_hEinCryo).isFailure()) {
+    error() << "Couldn't register histogram: hEinCryo" << endmsg;
+    return StatusCode::FAILURE;
+  }
+
   return StatusCode::SUCCESS;
 }
 
@@ -81,23 +99,36 @@ StatusCode UpstreamMaterial::execute() {
   // get the energy deposited in the cryostat and in the detector (each layer)
   const auto deposits = m_deposits.get();
   for (const auto& hit : *deposits) {
-    dd4hep::DDSegmentation::CellID cID = hit.core().cellId;
-    const auto& field = "cryo";
-    int id = decoder->get(cID, field);
-    if (id == 0) {
-      sumEcells[id - m_firstLayerId] += hit.core().energy;
+    dd4hep::DDSegmentation::CellID cellId = hit.core().cellId;
+    size_t cryoId = decoder->get(cellId, "cryo");
+    if (cryoId == 0) {
+      size_t layerId = decoder->get(cellId, "layer");
+      sumEcells[layerId - m_firstLayerId] += hit.core().energy;
     } else {
       sumEupstream += hit.core().energy;
     }
   }
+
+  // Calibrate the energy in the detector
   for (uint i = 0; i < m_numLayers; i++) {
-    // calibrate the energy in the detector
     sumEcells[i] /= m_samplingFraction[i];
     m_cellEnergyPhi[i]->Fill(phi, sumEcells[i]);
     m_upstreamEnergyCellEnergy[i]->Fill(sumEcells[i], sumEupstream);
-    verbose() << "Energy deposited in layer " << i << " = " << sumEcells[i]
-              << "\t energy deposited in the cryostat = " << sumEupstream << endmsg;
+    verbose() << "Energy deposited in layer " << i << ": " << sumEcells[i] << " GeV" << endmsg;
   }
+  m_hEinCryo->Fill(sumEupstream);
+  verbose() << "Energy deposited in the cryostat: " << sumEupstream << " GeV" << endmsg;
+
+  // Sum energy deposited in all calorimeter layers
+  {
+    double sumEinLayers = 0.;
+    for (uint i = 0; i < m_numLayers; i++) {
+      sumEinLayers += sumEcells[i];
+    }
+    m_hSumEinLayers->Fill(sumEinLayers);
+    verbose() << "Sum of energy deposited in all layers: " << sumEinLayers << " GeV" << endmsg;
+  }
+
   return StatusCode::SUCCESS;
 }
 

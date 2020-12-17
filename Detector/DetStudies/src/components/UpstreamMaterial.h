@@ -60,8 +60,14 @@ private:
   SmartIF<ITHistSvc> m_histSvc;
   /// Pointer to the geometry service
   ServiceHandle<IGeoSvc> m_geoSvc;
+  /// Pointer to the histograms showing upstream energy vs energy deposited in every layer
   std::vector<TH2F*> m_upstreamEnergyCellEnergy;
+  /// Pointer to histograms showing the energy in Phi
   std::vector<TH1F*> m_cellEnergyPhi;
+  /// Pointer to histogram with sum of energy deposited in all calorimeter layers
+  TH1F* m_hSumEinLayers;
+  /// Pointer to histogram with energy deposited in cryostat
+  TH1F* m_hEinCryo;
   /// Name of the active field
   Gaudi::Property<std::string> m_activeFieldName{this, "activeFieldName", "active", "Name of active field"};
   /// Name of the cells/layer field

@@ -11,6 +11,7 @@
 #include "GaudiKernel/ITHistSvc.h"
 #include "TH1F.h"
 #include "TH2F.h"
+#include "TGraph.h"
 #include "TVector2.h"
 
 // DD4hep
@@ -27,22 +28,24 @@ UpstreamMaterial::~UpstreamMaterial() {}
 
 StatusCode UpstreamMaterial::initialize() {
   if (GaudiAlgorithm::initialize().isFailure()) return StatusCode::FAILURE;
-  
+
   if (!m_geoSvc) {
     error() << "Unable to locate Geometry Service. "
             << "Make sure you have GeoSvc and SimSvc in the right order in the configuration." << endmsg;
     return StatusCode::FAILURE;
   }
-  // check if readouts exist
+  // Check if readouts exist
   if (m_geoSvc->lcdd()->readouts().find(m_readoutName) == m_geoSvc->lcdd()->readouts().end()) {
     error() << "Readout <<" << m_readoutName << ">> does not exist." << endmsg;
     return StatusCode::FAILURE;
   }
+  // Check histogram service
   m_histSvc = service("THistSvc");
   if (!m_histSvc) {
     error() << "Unable to locate Histogram Service" << endmsg;
     return StatusCode::FAILURE;
   }
+
   for (uint i = 0; i < m_numLayers; i++) {
     m_cellEnergyPhi.push_back(new TH1F(("upstreamEnergy_phi" + std::to_string(i)).c_str(),
                                        ("Energy deposited in layer " + std::to_string(i)).c_str(), 1000, -m_phi,
@@ -52,16 +55,19 @@ StatusCode UpstreamMaterial::initialize() {
       return StatusCode::FAILURE;
     }
 
-    m_upstreamEnergyCellEnergy.emplace_back(
-        new TH2F(("upstreamEnergy_presamplerEnergy" + std::to_string(i)).c_str(),
-                 ("Upstream energy vs energy deposited in layer " + std::to_string(i)).c_str(),
-                 2000, 0., (i == 0 ? 0.1 : 0.7) * m_energy, 2000, 0., std::log(m_energy)));
-    if (m_histSvc
-            ->regHist("/det/upstreamEnergy_presamplerEnergy" + std::to_string(i), m_upstreamEnergyCellEnergy.back())
-            .isFailure()) {
-      error() << "Couldn't register hist" << endmsg;
-      return StatusCode::FAILURE;
-    }
+    // m_upstreamEnergyCellEnergy.emplace_back(
+    //     new TH2F(("upstreamEnergy_presamplerEnergy" + std::to_string(i)).c_str(),
+    //              ("Upstream energy vs energy deposited in layer " + std::to_string(i)).c_str(),
+    //              2000, 0., (i == 0 ? 0.1 : 0.7) * m_energy, 2000, 0., std::log(m_energy)));
+    // if (m_histSvc
+    //         ->regHist("/det/upstreamEnergy_presamplerEnergy" + std::to_string(i), m_upstreamEnergyCellEnergy.back())
+    //         .isFailure()) {
+    //   error() << "Couldn't register hist" << endmsg;
+    //   return StatusCode::FAILURE;
+    // }
+
+    m_gUpstreamEnergyCellEnergy.emplace_back(new TGraph());
+    m_gUpstreamEnergyCellEnergy.back()->SetName(("upstreamEnergy_presamplerEnergy_graph_" + std::to_string(i)).c_str());
   }
 
   m_hSumEinLayers = new TH1F("hSumEinLayers",
@@ -84,6 +90,8 @@ StatusCode UpstreamMaterial::initialize() {
 }
 
 StatusCode UpstreamMaterial::execute() {
+  verbose() << "Event Number: " << m_gUpstreamEnergyCellEnergy.front()->GetN() << endmsg;
+
   auto decoder = m_geoSvc->lcdd()->readout(m_readoutName).idSpec().decoder();
   double sumEupstream = 0.;
   std::vector<double> sumEcells;
@@ -113,7 +121,8 @@ StatusCode UpstreamMaterial::execute() {
   for (uint i = 0; i < m_numLayers; i++) {
     sumEcells[i] /= m_samplingFraction[i];
     m_cellEnergyPhi[i]->Fill(phi, sumEcells[i]);
-    m_upstreamEnergyCellEnergy[i]->Fill(sumEcells[i], sumEupstream);
+    // m_upstreamEnergyCellEnergy[i]->Fill(sumEcells[i], sumEupstream);
+    m_gUpstreamEnergyCellEnergy.at(i)->SetPoint(m_gUpstreamEnergyCellEnergy.at(i)->GetN(), sumEcells[i], sumEupstream);
     verbose() << "Energy deposited in layer " << i << ": " << sumEcells[i] << " GeV" << endmsg;
   }
   m_hEinCryo->Fill(sumEupstream);
@@ -132,4 +141,43 @@ StatusCode UpstreamMaterial::execute() {
   return StatusCode::SUCCESS;
 }
 
-StatusCode UpstreamMaterial::finalize() { return GaudiAlgorithm::finalize(); }
+
+StatusCode UpstreamMaterial::finalize() {
+  unsigned long int nEvt = m_gUpstreamEnergyCellEnergy.front()->GetN();
+  // size_t nBin = std::sqrt(nEvt) + 1;
+  size_t nBin = std::log2(nEvt) + 2;
+  verbose() << "Number of generated events: " << nEvt << endmsg;
+  verbose() << "Number of bins: " << nBin << endmsg;
+
+  for (size_t i = 0; i < m_gUpstreamEnergyCellEnergy.size(); ++i) {
+    double xMax = *std::max_element(m_gUpstreamEnergyCellEnergy.at(i)->GetX(),
+                                    m_gUpstreamEnergyCellEnergy.at(i)->GetX() + nEvt);
+    double yMax = *std::max_element(m_gUpstreamEnergyCellEnergy.at(i)->GetY(),
+                                    m_gUpstreamEnergyCellEnergy.at(i)->GetY() + nEvt);
+    xMax = 1.000001*xMax;
+    yMax = 1.000001*yMax;
+
+    std::string histName = "upstreamEnergy_presamplerEnergy_" + std::to_string(i);
+    m_upstreamEnergyCellEnergy.emplace_back(
+        new TH2F(histName.c_str(),
+                 ("Upstream energy vs energy deposited in layer " + std::to_string(i)).c_str(),
+                 nBin, 0., xMax, nBin, 0., yMax));
+    if (m_histSvc->regHist("/det/" + histName, m_upstreamEnergyCellEnergy.back()).isFailure()) {
+      error() << "Couldn't register histogram:\n" << histName << endmsg;
+      return StatusCode::FAILURE;
+    }
+  }
+
+  for (size_t i = 0; i < m_upstreamEnergyCellEnergy.size(); ++i) {
+    GraphToHist(m_gUpstreamEnergyCellEnergy.at(i), m_upstreamEnergyCellEnergy.at(i));
+  }
+
+  return GaudiAlgorithm::finalize();
+}
+
+
+void UpstreamMaterial::GraphToHist(TGraph* graph, TH2F* hist) {
+  for (int i = 0; i < graph->GetN(); ++i) {
+    hist->Fill(graph->GetPointX(i), graph->GetPointY(i));
+  }
+}

@@ -16,18 +16,20 @@ class MCParticleCollection;
 
 class TH2F;
 class TH1F;
+class TGraph;
 class ITHistSvc;
 
 /** @class UpstreamMaterial UpstreamMaterial.h
  *
- *  Histograms of energy deposited in the dead material of the the calorimeter.
- *  Cryostat material needs to be marked as sensitive (and therefore ID 'cryo'==1).
- *  Dependence of the energy deposited in the dead material on the energy deposited in each calorimeter layer is
+ * Histograms of energy deposited in the dead material of the calorimeter.
+ * Cryostat material needs to be marked as sensitive (and therefore ID 'cryo'==1).
+ * Dependence of the energy deposited in the dead material on the energy deposited in each calorimeter layer is
  * plotted.
- *  Dependence of the energy deposited in the dead material on the azimuthal angle of the incoming particle (MC truth)
+ * Dependence of the energy deposited in the dead material on the azimuthal angle of the incoming particle (MC truth)
  * is plotted.
  *
  *  @author Anna Zaborowska
+ *  @author Juraj Smiesko
  */
 
 class UpstreamMaterial : public GaudiAlgorithm {
@@ -48,6 +50,10 @@ public:
   virtual StatusCode finalize() final;
 
 private:
+  /**
+   *  Convert graph to hist
+   */
+  void GraphToHist(TGraph* graph, TH2F* hist);
   // Energy range in the histogram axis
   Gaudi::Property<double> m_energy{this, "energyAxis", 100, "Max energy for the axis of plot"};
   // Phi in the histogram axis
@@ -60,6 +66,8 @@ private:
   SmartIF<ITHistSvc> m_histSvc;
   /// Pointer to the geometry service
   ServiceHandle<IGeoSvc> m_geoSvc;
+  /// Pointer to the graphs showing upstream energy vs energy deposited in every layer
+  std::vector<TGraph*> m_gUpstreamEnergyCellEnergy;
   /// Pointer to the histograms showing upstream energy vs energy deposited in every layer
   std::vector<TH2F*> m_upstreamEnergyCellEnergy;
   /// Pointer to histograms showing the energy in Phi

@@ -5,10 +5,12 @@ from GaudiKernel.SystemOfUnits import MeV, GeV
 # Electron momentum in GeV
 momentum = 50
 # Theta min and max in degrees
-thetaMin = 85.
-thetaMax = 95.
+theta = 90.
+thetaSpread = 5.
+thetaMin = theta - thetaSpread
+thetaMax = theta + thetaSpread
 
-samplingFraction =  [0.24833, 0.09482, 0.12242, 0.14182, 0.15667, 0.16923, 0.17980, 0.20085]
+samplingFractions = [0.24833, 0.09482, 0.12242, 0.14182, 0.15667, 0.16923, 0.17980, 0.20085]
 
 # Data service
 from Configurables import FCCDataSvc
@@ -30,7 +32,7 @@ pgun.ThetaMax = thetaMax * _pi / 180.
 
 from Configurables import GenAlg
 genalg_pgun = GenAlg()
-genalg_pgun.SignalProvider = pgun 
+genalg_pgun.SignalProvider = pgun
 genalg_pgun.hepmc.Path = "hepmc"
 
 from Configurables import HepMCToEDMConverter
@@ -84,12 +86,12 @@ from Configurables import UpstreamMaterial
 hist = UpstreamMaterial("histsPresampler",
                         energyAxis=momentum,
                         phiAxis=0.1,
-                        readoutName = "ECalBarrelEta",
-                        layerFieldName = "layer",
-                        numLayers = 8,
+                        readoutName="ECalBarrelEta",
+                        layerFieldName="layer",
+                        numLayers=8,
                         # sampling fraction is given as the upstream correction will be applied on calibrated cells
-                        samplingFraction = samplingFraction,
-                        OutputLevel = INFO)
+                        samplingFraction=samplingFractions,
+                        OutputLevel=VERBOSE)
 hist.deposits.Path="ECalBarrelCells"
 hist.particle.Path="GenParticles"
 
@@ -109,16 +111,16 @@ hist.AuditExecute = True
 
 from Configurables import PodioOutput
 ### PODIO algorithm
-out = PodioOutput("out",OutputLevel=INFO)
+out = PodioOutput("out", OutputLevel=INFO)
 out.outputCommands = ["drop *"]
 out.filename = "fccee_upstreamMaterial_inclinedEcal_%i.root" % (momentum)
 
 # ApplicationMgr
 from Configurables import ApplicationMgr
-ApplicationMgr( TopAlg = [genalg_pgun, hepmc_converter, geantsim, createcellsBarrel, hist, out],
-                EvtSel = 'NONE',
-                EvtMax = 10,
-                # order is important, as GeoSvc is needed by G4SimSvc
-                ExtSvc = [podioevent, geoservice, geantservice, audsvc],
-                OutputLevel = INFO
+ApplicationMgr(TopAlg=[genalg_pgun, hepmc_converter, geantsim, createcellsBarrel, hist, out],
+               EvtSel='NONE',
+               EvtMax=10,
+               # order is important, as GeoSvc is needed by G4SimSvc
+               ExtSvc=[podioevent, geoservice, geantservice, audsvc],
+               OutputLevel=INFO
 )

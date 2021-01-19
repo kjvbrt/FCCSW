@@ -144,8 +144,8 @@ StatusCode UpstreamMaterial::execute() {
 
 StatusCode UpstreamMaterial::finalize() {
   unsigned long int nEvt = m_gUpstreamEnergyCellEnergy.front()->GetN();
-  // size_t nBin = std::sqrt(nEvt) + 1;
-  size_t nBin = std::log2(nEvt) + 2;
+  size_t nBin = std::sqrt(nEvt) + 1;
+  // size_t nBin = std::log2(nEvt) + 2;
   verbose() << "Number of generated events: " << nEvt << endmsg;
   verbose() << "Number of bins: " << nBin << endmsg;
 

@@ -95,7 +95,7 @@ hist = UpstreamMaterial("histsPresampler",
 hist.deposits.Path="ECalBarrelCells"
 hist.particle.Path="GenParticles"
 
-THistSvc().Output = ["det DATAFILE='histUpstream_fccee_hits_%iGeV.root' TYP='ROOT' OPT='RECREATE'" % (momentum)]
+THistSvc().Output = ["det DATAFILE='histUpstream_fccee_hits_%ideg_%iGeV.root' TYP='ROOT' OPT='RECREATE'" % (theta, momentum)]
 THistSvc().PrintAll=True
 THistSvc().AutoSave=True
 THistSvc().AutoFlush=True
@@ -113,7 +113,7 @@ from Configurables import PodioOutput
 ### PODIO algorithm
 out = PodioOutput("out", OutputLevel=INFO)
 out.outputCommands = ["drop *"]
-out.filename = "fccee_upstreamMaterial_inclinedEcal_%i.root" % (momentum)
+out.filename = "fccee_upstreamMaterial_inclinedEcal_%ideg_%iGeV.root" % (theta, momentum)
 
 # ApplicationMgr
 from Configurables import ApplicationMgr

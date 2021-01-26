@@ -164,12 +164,13 @@ StatusCode CorrectCaloClusters::applyUpstreamCorr(const fcc::CaloClusterCollecti
         continue;
       }
 
-      double P0 = m_P00[i] + m_P01[i] * inClusters->at(i).energy();
-      double P1 = m_P10[i] + m_P11[i] / std::sqrt(inClusters->at(i).energy());
+      double P0 = m_P00[i] + m_P01[i] * inClusters->at(j).energy();
+      // double P1 = m_P10[i] + m_P11[i] * inClusters->at(j).energy();
+      double P1 = m_P10[i] + m_P11[i] / std::sqrt(inClusters->at(j).energy());
       double energyCorr = P0 + P1 * energyInFirstLayer * m_samplingFractions[i][m_firstLayerIDs[i]];
       verbose() << "Energy correction: " << energyCorr << endmsg;
-      outClusters->at(i).core().energy += energyCorr;
-      verbose() << "Corrected cluster energy: " << outClusters->at(i).core().energy << endmsg;
+      outClusters->at(j).core().energy += energyCorr;
+      verbose() << "Corrected cluster energy: " << outClusters->at(j).core().energy << endmsg;
     }
   }
 

@@ -122,7 +122,7 @@ private:
       this, "numLayers", {8}, "Numbers of layers of the systems"};
   /// IDs of the first layer in the systems
   Gaudi::Property<std::vector<size_t>> m_firstLayerIDs {
-      this, "firstLayerIDs", {0}, "IDs of first layer in the systems"
+      this, "firstLayerIDs", {1}, "IDs of first layer in the systems"
   };
   /// Values of sampling fractions used for energy calibration of the systems
   Gaudi::Property<std::vector<std::vector<double>>> m_samplingFractions {
@@ -133,16 +133,20 @@ private:
 
   /// Upstream correction parameter P00 for upstream correction
   Gaudi::Property<std::vector<double>> m_P00 {
-      this, "P00", {0.1037}, "Upstream material parameter P00"};
+      // this, "P00", {0.0319}, "Upstream material parameter P00"};
+      this, "P00", {0.0298}, "Upstream material parameter P00"};
   /// Upstream correction parameter P01 for upstream correction
   Gaudi::Property<std::vector<double>> m_P01 {
-      this, "P01", {0.0007507}, "Upstream material parameter P01"};
+      // this, "P01", {0.000192}, "Upstream material parameter P01"};
+      this, "P01", {0.0001468}, "Upstream material parameter P01"};
   /// Upstream correction parameter P10 for upstream correction
   Gaudi::Property<std::vector<double>> m_P10 {
-      this, "P10", {0.1382}, "Upstream material parameter P10"};
+      // this, "P10", {1.08}, "Upstream material parameter P10"};
+      this, "P10", {0.01014}, "Upstream material parameter P10"};
   /// Upstream correction parameter P11 for upstream correction
   Gaudi::Property<std::vector<double>> m_P11 {
-      this, "P11", {1.002}, "Upstream material parameter P11"};
+      // this, "P11", {0.00113}, "Upstream material parameter P11"};
+      this, "P11", {0.02855}, "Upstream material parameter P11"};
 };
 
 #endif /* RECCALORIMETER_CORRECTCALOCLUSTERS_H */

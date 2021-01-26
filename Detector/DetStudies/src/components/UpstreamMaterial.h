@@ -72,10 +72,20 @@ private:
   std::vector<TH2F*> m_upstreamEnergyCellEnergy;
   /// Pointer to histograms showing the energy in Phi
   std::vector<TH1F*> m_cellEnergyPhi;
+  /// Pointer to histogram with energy deposited in calorimeter layers
+  TH1F* m_hEnergyInLayers;
   /// Pointer to histogram with sum of energy deposited in all calorimeter layers
   TH1F* m_hSumEinLayers;
   /// Pointer to histogram with energy deposited in cryostat
-  TH1F* m_hEinCryo;
+  TH1F* m_hEnergyInCryo;
+  /// Pointer to histogram showing particle momentum in XY plane
+  TH2F* m_hParticleMomentumXY;
+  /// Pointer to histogram showing particle momentum in ZY plane
+  TH2F* m_hParticleMomentumZY;
+  /// Pointer to histogram showing hit position in XY plane (r is assumed to be 1)
+  TH2F* m_hHitPositionXY;
+  /// Pointer to histogram showing hit position in ZY plane (r is assumed to be 1)
+  TH2F* m_hHitPositionZY;
   /// Name of the active field
   Gaudi::Property<std::string> m_activeFieldName{this, "activeFieldName", "active", "Name of active field"};
   /// Name of the cells/layer field

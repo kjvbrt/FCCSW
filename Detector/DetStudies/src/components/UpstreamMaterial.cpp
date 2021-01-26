@@ -50,39 +50,71 @@ StatusCode UpstreamMaterial::initialize() {
     m_cellEnergyPhi.push_back(new TH1F(("upstreamEnergy_phi" + std::to_string(i)).c_str(),
                                        ("Energy deposited in layer " + std::to_string(i)).c_str(), 1000, -m_phi,
                                        m_phi));
+    m_cellEnergyPhi.back()->Sumw2();
     if (m_histSvc->regHist("/det/upstreamEnergy_phi" + std::to_string(i), m_cellEnergyPhi.back()).isFailure()) {
       error() << "Couldn't register histogram" << endmsg;
       return StatusCode::FAILURE;
     }
 
-    // m_upstreamEnergyCellEnergy.emplace_back(
-    //     new TH2F(("upstreamEnergy_presamplerEnergy" + std::to_string(i)).c_str(),
-    //              ("Upstream energy vs energy deposited in layer " + std::to_string(i)).c_str(),
-    //              2000, 0., (i == 0 ? 0.1 : 0.7) * m_energy, 2000, 0., std::log(m_energy)));
-    // if (m_histSvc
-    //         ->regHist("/det/upstreamEnergy_presamplerEnergy" + std::to_string(i), m_upstreamEnergyCellEnergy.back())
-    //         .isFailure()) {
-    //   error() << "Couldn't register hist" << endmsg;
-    //   return StatusCode::FAILURE;
-    // }
-
     m_gUpstreamEnergyCellEnergy.emplace_back(new TGraph());
     m_gUpstreamEnergyCellEnergy.back()->SetName(("upstreamEnergy_presamplerEnergy_graph_" + std::to_string(i)).c_str());
   }
 
-  m_hSumEinLayers = new TH1F("hSumEinLayers",
-                             "Sum of energy deposited in all layers;E [GeV];N_{evt}",
-                             400, 0.7*m_energy, 1.3*m_energy);
-  if (m_histSvc->regHist("/det/sumEinLayers", m_hSumEinLayers).isFailure()) {
-    error() << "Couldn't register histogram: hSumEinLayers" << endmsg;
+  m_hEnergyInLayers = new TH1F("energyInLayers", "Energy deposited in layer ",
+                               m_numLayers, 0, m_numLayers);
+  m_hEnergyInLayers->Sumw2();
+  if (m_histSvc->regHist("/det/energyInLayers", m_hEnergyInLayers).isFailure()) {
+    error() << "Couldn't register histogram \"energyInLayers\"!" << endmsg;
     return StatusCode::FAILURE;
   }
 
-  m_hEinCryo = new TH1F("hEinCryo",
-                        "Energy deposited in cryostat;E [GeV];N_{evt}",
-                        200, 0., 0.2*m_energy);
-  if (m_histSvc->regHist("/det/EinCryo", m_hEinCryo).isFailure()) {
-    error() << "Couldn't register histogram: hEinCryo" << endmsg;
+  m_hSumEinLayers = new TH1F("sumEinLayers",
+                             "Sum of energy deposited in all layers;E [GeV];N_{evt}",
+                             200, 0., 0.);
+  m_hSumEinLayers->Sumw2();
+  if (m_histSvc->regHist("/det/sumEinLayers", m_hSumEinLayers).isFailure()) {
+    error() << "Couldn't register histogram \"sumEinLayers\"!" << endmsg;
+    return StatusCode::FAILURE;
+  }
+
+  m_hEnergyInCryo = new TH1F("energyInCryo",
+                             "Energy deposited in cryostat;E [GeV];N_{evt}",
+                             200, 0., 0.);
+  m_hEnergyInCryo->Sumw2();
+  if (m_histSvc->regHist("/det/energyInCryo", m_hEnergyInCryo).isFailure()) {
+    error() << "Couldn't register histogram \"EnergyInCryo\"!" << endmsg;
+    return StatusCode::FAILURE;
+  }
+
+  m_hParticleMomentumXY = new TH2F("particleMomentumXY",
+                                   "Particle momentum in XY plane;p_{x};p_{y}",
+                                   200, 0., 0., 200, 0., 0.);
+  if (m_histSvc->regHist("/det/particleMomentumXY", m_hParticleMomentumXY).isFailure()) {
+    error() << "Couldn't register histogram \"particleMomentumXY\"!" << endmsg;
+    return StatusCode::FAILURE;
+  }
+
+  m_hParticleMomentumZY = new TH2F("hParticleMomentumZY",
+                                   "Particle momentum in ZY plane;p_{z};p_{y}",
+                                   200, 0., 0., 200, 0., 0.);
+  if (m_histSvc->regHist("/det/ParticleMomentumZY", m_hParticleMomentumZY).isFailure()) {
+    error() << "Couldn't register histogram \"hParticleMomentumZY\"!" << endmsg;
+    return StatusCode::FAILURE;
+  }
+
+  m_hHitPositionXY = new TH2F("hHitPositionXY",
+                                   "Hit position in XY plane;p_{x};p_{y}",
+                                   200, -3., 3., 200, -3., 3.);
+  if (m_histSvc->regHist("/det/HitPositionXY", m_hHitPositionXY).isFailure()) {
+    error() << "Couldn't register histogram: hHitPositionXY" << endmsg;
+    return StatusCode::FAILURE;
+  }
+
+  m_hHitPositionZY = new TH2F("hHitPositionZY",
+                                   "Hit position in ZY plane;p_{z};p_{y}",
+                                   200, -3., 3., 200, -3., 3.);
+  if (m_histSvc->regHist("/det/HitPositionZY", m_hHitPositionZY).isFailure()) {
+    error() << "Couldn't register histogram: hHitPositionZY" << endmsg;
     return StatusCode::FAILURE;
   }
 
@@ -93,6 +125,12 @@ StatusCode UpstreamMaterial::execute() {
   verbose() << "Event Number: " << m_gUpstreamEnergyCellEnergy.front()->GetN() << endmsg;
 
   auto decoder = m_geoSvc->lcdd()->readout(m_readoutName).idSpec().decoder();
+  auto segmentation = m_geoSvc->lcdd()->readout(m_readoutName).segmentation().segmentation();
+  verbose() << "segmentation: " << segmentation->name() << endmsg;
+  if (segmentation == nullptr) {
+    warning() << "PhiEta segmentation not found, hit position histograms won't get filled!" << endmsg;
+  }
+
   double sumEupstream = 0.;
   std::vector<double> sumEcells;
   sumEcells.assign(m_numLayers, 0);
@@ -102,6 +140,8 @@ StatusCode UpstreamMaterial::execute() {
   double phi = 0;
   for (const auto& part : *particle) {
     phi = atan2(part.core().p4.py, part.core().p4.px);
+    m_hParticleMomentumXY->Fill(part.core().p4.px, part.core().p4.py);
+    m_hParticleMomentumZY->Fill(part.core().p4.pz, part.core().p4.py);
   }
 
   // get the energy deposited in the cryostat and in the detector (each layer)
@@ -117,21 +157,32 @@ StatusCode UpstreamMaterial::execute() {
     }
   }
 
+  // get position of the deposits
+  size_t nDeposits = 0;
+  for (const auto& hit: *deposits) {
+    dd4hep::DDSegmentation::CellID cellId = hit.core().cellId;
+    dd4hep::DDSegmentation::Vector3D position = segmentation->position(cellId);
+    m_hHitPositionXY->Fill(position.x(), position.y());
+    m_hHitPositionZY->Fill(position.z(), position.y());
+    nDeposits += 1;
+  }
+  verbose() << "Number of deposits: " << nDeposits << endmsg;
+
   // Calibrate the energy in the detector
-  for (uint i = 0; i < m_numLayers; i++) {
+  for (size_t i = 0; i < m_numLayers; i++) {
     sumEcells[i] /= m_samplingFraction[i];
     m_cellEnergyPhi[i]->Fill(phi, sumEcells[i]);
-    // m_upstreamEnergyCellEnergy[i]->Fill(sumEcells[i], sumEupstream);
     m_gUpstreamEnergyCellEnergy.at(i)->SetPoint(m_gUpstreamEnergyCellEnergy.at(i)->GetN(), sumEcells[i], sumEupstream);
+    m_hEnergyInLayers->Fill(i, sumEcells[i]);
     verbose() << "Energy deposited in layer " << i << ": " << sumEcells[i] << " GeV" << endmsg;
   }
-  m_hEinCryo->Fill(sumEupstream);
+  m_hEnergyInCryo->Fill(sumEupstream);
   verbose() << "Energy deposited in the cryostat: " << sumEupstream << " GeV" << endmsg;
 
   // Sum energy deposited in all calorimeter layers
   {
     double sumEinLayers = 0.;
-    for (uint i = 0; i < m_numLayers; i++) {
+    for (size_t i = 0; i < m_numLayers; ++i) {
       sumEinLayers += sumEcells[i];
     }
     m_hSumEinLayers->Fill(sumEinLayers);
@@ -162,8 +213,9 @@ StatusCode UpstreamMaterial::finalize() {
         new TH2F(histName.c_str(),
                  ("Upstream energy vs energy deposited in layer " + std::to_string(i)).c_str(),
                  nBin, 0., xMax, nBin, 0., yMax));
+    m_upstreamEnergyCellEnergy.back()->Sumw2();
     if (m_histSvc->regHist("/det/" + histName, m_upstreamEnergyCellEnergy.back()).isFailure()) {
-      error() << "Couldn't register histogram:\n" << histName << endmsg;
+      error() << "Couldn't register histogram \"" << histName << "\"!" << endmsg;
       return StatusCode::FAILURE;
     }
   }

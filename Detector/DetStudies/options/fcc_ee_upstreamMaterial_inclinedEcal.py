@@ -11,6 +11,7 @@ thetaMin = theta - thetaSpread
 thetaMax = theta + thetaSpread
 
 samplingFractions = [0.24833, 0.09482, 0.12242, 0.14182, 0.15667, 0.16923, 0.17980, 0.20085]
+# samplingFractions = [0.12125] + [0.14283] + [0.16354] + [0.17662] + [0.18867] + [0.19890] + [0.20637] + [0.20802]
 
 # Data service
 from Configurables import FCCDataSvc
@@ -45,6 +46,8 @@ hepmc_converter.genvertices.Path="GenVertices"
 from Configurables import GeoSvc
 geoservice = GeoSvc("GeoSvc", detectors=['file:Detector/DetFCCeeIDEA-LAr/compact/FCCee_DectEmptyMaster.xml',
                                          'file:Detector/DetFCCeeECalInclined/compact/FCCee_ECalBarrel_upstream.xml'],
+# geoservice = GeoSvc("GeoSvc", detectors=['file:Detector/DetFCChhBaseline1/compact/FCChh_DectEmptyMaster.xml',
+#                                          'file:Detector/DetFCChhECalInclined/compact/FCChh_ECalBarrel_upstream.xml'],
                     OutputLevel = INFO)
 
 # Geant4 service

@@ -121,7 +121,8 @@ createClusters.clusterCells.Path = "CaloClusterCells"
 from Configurables import CorrectCaloClusters
 corrClusters = CorrectCaloClusters("corrClusters",
                                    inClusters="CaloClusters",
-                                   outClusters="CaloClustersCorrected")
+                                   outClusters="CaloClustersCorrected",
+                                   OutputLevel=VERBOSE)
 
 
 import uuid

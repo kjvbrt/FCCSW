@@ -29,16 +29,27 @@ UpstreamMaterial::~UpstreamMaterial() {}
 StatusCode UpstreamMaterial::initialize() {
   if (GaudiAlgorithm::initialize().isFailure()) return StatusCode::FAILURE;
 
+  // Check geometry service
   if (!m_geoSvc) {
     error() << "Unable to locate Geometry Service. "
             << "Make sure you have GeoSvc and SimSvc in the right order in the configuration." << endmsg;
     return StatusCode::FAILURE;
   }
+
   // Check if readouts exist
   if (m_geoSvc->lcdd()->readouts().find(m_readoutName) == m_geoSvc->lcdd()->readouts().end()) {
     error() << "Readout <<" << m_readoutName << ">> does not exist." << endmsg;
     return StatusCode::FAILURE;
   }
+
+  // Check segmentation
+  auto segmentation = m_geoSvc->lcdd()->readout(m_readoutName).segmentation().segmentation();
+  if (segmentation) {
+    verbose() << "Segmentation name: " << segmentation->name() << endmsg;
+  } else {
+    warning() << "Segmentation not found, hit position histograms won't get filled!" << endmsg;
+  }
+
   // Check histogram service
   m_histSvc = service("THistSvc");
   if (!m_histSvc) {
@@ -46,6 +57,7 @@ StatusCode UpstreamMaterial::initialize() {
     return StatusCode::FAILURE;
   }
 
+  // Define and register histograms
   for (uint i = 0; i < m_numLayers; i++) {
     m_cellEnergyPhi.push_back(new TH1F(("upstreamEnergy_phi" + std::to_string(i)).c_str(),
                                        ("Energy deposited in layer " + std::to_string(i)).c_str(), 1000, -m_phi,
@@ -83,6 +95,51 @@ StatusCode UpstreamMaterial::initialize() {
   m_hEnergyInCryo->Sumw2();
   if (m_histSvc->regHist("/det/energyInCryo", m_hEnergyInCryo).isFailure()) {
     error() << "Couldn't register histogram \"EnergyInCryo\"!" << endmsg;
+    return StatusCode::FAILURE;
+  }
+
+  m_hEnergyInCryoFront = new TH1F("energyInCryoFront",
+                                  "Energy deposited in cryostat front;E [GeV];N_{evt}",
+                                  200, 0., 0.);
+  m_hEnergyInCryoFront->Sumw2();
+  if (m_histSvc->regHist("/det/energyInCryoFront", m_hEnergyInCryoFront).isFailure()) {
+    error() << "Couldn't register histogram \"EnergyInCryoFront\"!" << endmsg;
+    return StatusCode::FAILURE;
+  }
+
+  m_hEnergyInCryoBack = new TH1F("energyInCryoBack",
+                                  "Energy deposited in cryostat back;E [GeV];N_{evt}",
+                                  200, 0., 0.);
+  m_hEnergyInCryoBack->Sumw2();
+  if (m_histSvc->regHist("/det/energyInCryoBack", m_hEnergyInCryoBack).isFailure()) {
+    error() << "Couldn't register histogram \"EnergyInCryoBack\"!" << endmsg;
+    return StatusCode::FAILURE;
+  }
+
+  m_hEnergyInCryoSides = new TH1F("energyInCryoSides",
+                                  "Energy deposited in cryostat sides;E [GeV];N_{evt}",
+                                  200, 0., 0.);
+  m_hEnergyInCryoSides->Sumw2();
+  if (m_histSvc->regHist("/det/energyInCryoSides", m_hEnergyInCryoSides).isFailure()) {
+    error() << "Couldn't register histogram \"EnergyInCryoSides\"!" << endmsg;
+    return StatusCode::FAILURE;
+  }
+
+  m_hEnergyInCryoLArBathFront = new TH1F("energyInCryoLArBathFront",
+                                  "Energy deposited in cryostat LAr bath front;E [GeV];N_{evt}",
+                                  200, 0., 0.);
+  m_hEnergyInCryoLArBathFront->Sumw2();
+  if (m_histSvc->regHist("/det/energyInCryoLArBathFront", m_hEnergyInCryoLArBathFront).isFailure()) {
+    error() << "Couldn't register histogram \"EnergyInCryoLArBathFront\"!" << endmsg;
+    return StatusCode::FAILURE;
+  }
+
+  m_hEnergyInCryoLArBathBack = new TH1F("energyInCryoLArBathBack",
+                                  "Energy deposited in cryostat LAr bath back;E [GeV];N_{evt}",
+                                  200, 0., 0.);
+  m_hEnergyInCryoLArBathBack->Sumw2();
+  if (m_histSvc->regHist("/det/energyInCryoLArBathBack", m_hEnergyInCryoLArBathBack).isFailure()) {
+    error() << "Couldn't register histogram \"EnergyInCryoLArBathBack\"!" << endmsg;
     return StatusCode::FAILURE;
   }
 
@@ -126,14 +183,6 @@ StatusCode UpstreamMaterial::execute() {
 
   auto decoder = m_geoSvc->lcdd()->readout(m_readoutName).idSpec().decoder();
   auto segmentation = m_geoSvc->lcdd()->readout(m_readoutName).segmentation().segmentation();
-  verbose() << "segmentation: " << segmentation->name() << endmsg;
-  if (segmentation == nullptr) {
-    warning() << "PhiEta segmentation not found, hit position histograms won't get filled!" << endmsg;
-  }
-
-  double sumEupstream = 0.;
-  std::vector<double> sumEcells;
-  sumEcells.assign(m_numLayers, 0);
 
   // first check MC phi angle
   const auto particle = m_particle.get();
@@ -144,50 +193,87 @@ StatusCode UpstreamMaterial::execute() {
     m_hParticleMomentumZY->Fill(part.core().p4.pz, part.core().p4.py);
   }
 
-  // get the energy deposited in the cryostat and in the detector (each layer)
+  // Get the energy deposited in the cryostat(s) and in the detector (each layer)
   const auto deposits = m_deposits.get();
-  for (const auto& hit : *deposits) {
+  std::vector<float> sumEinLayer;
+  sumEinLayer.assign(m_numLayers, 0);
+  float sumEinCryo = 0.;
+  float sumEinCryoFront = 0.;
+  float sumEinCryoBack = 0.;
+  float sumEinCryoSides = 0.;
+  float sumEinCryoLArBathFront = 0.;
+  float sumEinCryoLArBathBack = 0.;
+  for (const auto& hit: *deposits) {
     dd4hep::DDSegmentation::CellID cellId = hit.core().cellId;
     size_t cryoId = decoder->get(cellId, "cryo");
     if (cryoId == 0) {
       size_t layerId = decoder->get(cellId, "layer");
-      sumEcells[layerId - m_firstLayerId] += hit.core().energy;
+      sumEinLayer[layerId] += hit.core().energy;
     } else {
-      sumEupstream += hit.core().energy;
+      sumEinCryo += hit.core().energy;
+      size_t cryoTypeId = decoder->get(cellId, "type");
+      switch(cryoTypeId) {
+        case 1: sumEinCryoFront += hit.core().energy;
+                break;
+        case 2: sumEinCryoBack += hit.core().energy;
+                break;
+        case 3: sumEinCryoSides += hit.core().energy;
+                break;
+        case 4: sumEinCryoLArBathFront += hit.core().energy;
+                break;
+        case 5: sumEinCryoLArBathFront += hit.core().energy;
+                break;
+        default: warning() << "Wrong cryostat type ID found!\ncryoTypeId: " << cryoTypeId << endmsg;
+      }
     }
   }
 
-  // get position of the deposits
-  size_t nDeposits = 0;
-  for (const auto& hit: *deposits) {
-    dd4hep::DDSegmentation::CellID cellId = hit.core().cellId;
-    dd4hep::DDSegmentation::Vector3D position = segmentation->position(cellId);
-    m_hHitPositionXY->Fill(position.x(), position.y());
-    m_hHitPositionZY->Fill(position.z(), position.y());
-    nDeposits += 1;
+  // Get position of the deposits
+  if (segmentation) {
+    for (const auto& hit: *deposits) {
+      dd4hep::DDSegmentation::CellID cellId = hit.core().cellId;
+      dd4hep::DDSegmentation::Vector3D position = segmentation->position(cellId);
+      m_hHitPositionXY->Fill(position.x(), position.y());
+      m_hHitPositionZY->Fill(position.z(), position.y());
+    }
   }
-  verbose() << "Number of deposits: " << nDeposits << endmsg;
 
-  // Calibrate the energy in the detector
-  for (size_t i = 0; i < m_numLayers; i++) {
-    sumEcells[i] /= m_samplingFraction[i];
-    m_cellEnergyPhi[i]->Fill(phi, sumEcells[i]);
-    m_gUpstreamEnergyCellEnergy.at(i)->SetPoint(m_gUpstreamEnergyCellEnergy.at(i)->GetN(), sumEcells[i], sumEupstream);
-    m_hEnergyInLayers->Fill(i, sumEcells[i]);
-    verbose() << "Energy deposited in layer " << i << ": " << sumEcells[i] << " GeV" << endmsg;
+  // Calibrate energy in the calorimeter layers
+  for (size_t i = 0; i < m_numLayers; ++i) {
+    sumEinLayer[i] /= m_samplingFraction[i];
   }
-  m_hEnergyInCryo->Fill(sumEupstream);
-  verbose() << "Energy deposited in the cryostat: " << sumEupstream << " GeV" << endmsg;
 
   // Sum energy deposited in all calorimeter layers
-  {
-    double sumEinLayers = 0.;
-    for (size_t i = 0; i < m_numLayers; ++i) {
-      sumEinLayers += sumEcells[i];
-    }
-    m_hSumEinLayers->Fill(sumEinLayers);
-    verbose() << "Sum of energy deposited in all layers: " << sumEinLayers << " GeV" << endmsg;
+  float sumEinCalo = 0.;
+  for (size_t i = 0; i < m_numLayers; ++i) {
+    sumEinCalo += sumEinLayer[i];
   }
+
+  // Fill histograms and graphs
+  for (size_t i = 0; i < m_numLayers; ++i) {
+    m_cellEnergyPhi[i]->Fill(phi, sumEinLayer[i]);
+    // m_gUpstreamEnergyCellEnergy.at(i)->SetPoint(m_gUpstreamEnergyCellEnergy.at(i)->GetN(),
+    //                                             sumEinLayer[i], sumEinCryoFront + sumEinCryoLArBathFront);
+    m_gUpstreamEnergyCellEnergy.at(i)->SetPoint(m_gUpstreamEnergyCellEnergy.at(i)->GetN(),
+                                                sumEinLayer[i], sumEinCryo);
+    m_hEnergyInLayers->Fill(i, sumEinLayer[i]);
+    verbose() << "Energy deposited in layer " << i << ": " << sumEinLayer[i] << " GeV" << endmsg;
+  }
+  m_hSumEinLayers->Fill(sumEinCalo);
+  verbose() << "Sum of energy deposited in all calorimeter layers: " << sumEinCalo << " GeV" << endmsg;
+
+  m_hEnergyInCryo->Fill(sumEinCryo);
+  m_hEnergyInCryoFront->Fill(sumEinCryoFront);
+  m_hEnergyInCryoBack->Fill(sumEinCryoBack);
+  m_hEnergyInCryoSides->Fill(sumEinCryoSides);
+  m_hEnergyInCryoLArBathFront->Fill(sumEinCryoLArBathFront);
+  m_hEnergyInCryoLArBathBack->Fill(sumEinCryoLArBathBack);
+  verbose() << "Energy deposited in the cryostat: " << sumEinCryo << " GeV" << endmsg;
+  verbose() << "Energy deposited in the cryostat front: " << sumEinCryoFront << " GeV" << endmsg;
+  verbose() << "Energy deposited in the cryostat back: " << sumEinCryoBack<< " GeV" << endmsg;
+  verbose() << "Energy deposited in the cryostat sides: " << sumEinCryoSides << " GeV" << endmsg;
+  verbose() << "Energy deposited in the cryostat LAr bath front: " << sumEinCryoLArBathFront << " GeV" << endmsg;
+  verbose() << "Energy deposited in the cryostat LAr bath back: " << sumEinCryoLArBathBack << " GeV" << endmsg;
 
   return StatusCode::SUCCESS;
 }

@@ -78,6 +78,16 @@ private:
   TH1F* m_hSumEinLayers;
   /// Pointer to histogram with energy deposited in cryostat
   TH1F* m_hEnergyInCryo;
+  /// Pointer to histogram with energy deposited in cryostat front
+  TH1F* m_hEnergyInCryoFront;
+  /// Pointer to histogram with energy deposited in cryostat back
+  TH1F* m_hEnergyInCryoBack;
+  /// Pointer to histogram with energy deposited in cryostat sides
+  TH1F* m_hEnergyInCryoSides;
+  /// Pointer to histogram with energy deposited in cryostat LAr bath front
+  TH1F* m_hEnergyInCryoLArBathFront;
+  /// Pointer to histogram with energy deposited in cryostat LAr bath back
+  TH1F* m_hEnergyInCryoLArBathBack;
   /// Pointer to histogram showing particle momentum in XY plane
   TH2F* m_hParticleMomentumXY;
   /// Pointer to histogram showing particle momentum in ZY plane

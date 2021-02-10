@@ -221,7 +221,7 @@ StatusCode UpstreamMaterial::execute() {
                 break;
         case 4: sumEinCryoLArBathFront += hit.core().energy;
                 break;
-        case 5: sumEinCryoLArBathFront += hit.core().energy;
+        case 5: sumEinCryoLArBathBack += hit.core().energy;
                 break;
         default: warning() << "Wrong cryostat type ID found!\ncryoTypeId: " << cryoTypeId << endmsg;
       }
@@ -252,10 +252,8 @@ StatusCode UpstreamMaterial::execute() {
   // Fill histograms and graphs
   for (size_t i = 0; i < m_numLayers; ++i) {
     m_cellEnergyPhi[i]->Fill(phi, sumEinLayer[i]);
-    // m_gUpstreamEnergyCellEnergy.at(i)->SetPoint(m_gUpstreamEnergyCellEnergy.at(i)->GetN(),
-    //                                             sumEinLayer[i], sumEinCryoFront + sumEinCryoLArBathFront);
     m_gUpstreamEnergyCellEnergy.at(i)->SetPoint(m_gUpstreamEnergyCellEnergy.at(i)->GetN(),
-                                                sumEinLayer[i], sumEinCryo);
+                                                sumEinLayer[i], sumEinCryoFront + sumEinCryoLArBathFront);
     m_hEnergyInLayers->Fill(i, sumEinLayer[i]);
     verbose() << "Energy deposited in layer " << i << ": " << sumEinLayer[i] << " GeV" << endmsg;
   }
@@ -280,9 +278,8 @@ StatusCode UpstreamMaterial::execute() {
 
 
 StatusCode UpstreamMaterial::finalize() {
-  unsigned long int nEvt = m_gUpstreamEnergyCellEnergy.front()->GetN();
+  size_t nEvt = m_gUpstreamEnergyCellEnergy.front()->GetN();
   size_t nBin = std::sqrt(nEvt) + 1;
-  // size_t nBin = std::log2(nEvt) + 2;
   verbose() << "Number of generated events: " << nEvt << endmsg;
   verbose() << "Number of bins: " << nBin << endmsg;
 

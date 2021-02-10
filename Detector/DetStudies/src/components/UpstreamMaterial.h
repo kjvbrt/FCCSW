@@ -70,6 +70,8 @@ private:
   std::vector<TGraph*> m_gUpstreamEnergyCellEnergy;
   /// Pointer to the histograms showing upstream energy vs energy deposited in every layer
   std::vector<TH2F*> m_upstreamEnergyCellEnergy;
+  /// Pointer to the histograms showing downstream energy vs energy deposited in every layer
+  std::vector<TH2F*> m_downstreamEnergyEnergyInLayer;
   /// Pointer to histograms showing the energy in Phi
   std::vector<TH1F*> m_cellEnergyPhi;
   /// Pointer to histogram with energy deposited in calorimeter layers

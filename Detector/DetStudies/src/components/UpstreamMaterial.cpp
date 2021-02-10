@@ -70,6 +70,17 @@ StatusCode UpstreamMaterial::initialize() {
 
     m_gUpstreamEnergyCellEnergy.emplace_back(new TGraph());
     m_gUpstreamEnergyCellEnergy.back()->SetName(("upstreamEnergy_presamplerEnergy_graph_" + std::to_string(i)).c_str());
+
+    // Downstream energy vs. energy in every layer
+    std::string histName = "downstreamEnergy_energyInLayer_" + std::to_string(i);
+    std::string histTitle = "Downstream energy vs energy deposited in layer id: " + std::to_string(i);
+    histTitle += ";Energy in layer id: " + std::to_string(i) + " [GeV];Downstream Energy [GeV]";
+    m_downstreamEnergyEnergyInLayer.emplace_back(new TH2F(histName.c_str(), histTitle.c_str(), 50, 0., 0., 50, 0., 0.));
+    m_downstreamEnergyEnergyInLayer.back()->Sumw2();
+    if (m_histSvc->regHist("/det/" + histName, m_downstreamEnergyEnergyInLayer.back()).isFailure()) {
+      error() << "Couldn't register histogram \"" << histName << "\"!" << endmsg;
+      return StatusCode::FAILURE;
+    }
   }
 
   m_hEnergyInLayers = new TH1F("energyInLayers", "Energy deposited in layer ",
@@ -252,9 +263,10 @@ StatusCode UpstreamMaterial::execute() {
   // Fill histograms and graphs
   for (size_t i = 0; i < m_numLayers; ++i) {
     m_cellEnergyPhi[i]->Fill(phi, sumEinLayer[i]);
+    m_hEnergyInLayers->Fill(i, sumEinLayer[i]);
     m_gUpstreamEnergyCellEnergy.at(i)->SetPoint(m_gUpstreamEnergyCellEnergy.at(i)->GetN(),
                                                 sumEinLayer[i], sumEinCryoFront + sumEinCryoLArBathFront);
-    m_hEnergyInLayers->Fill(i, sumEinLayer[i]);
+    m_downstreamEnergyEnergyInLayer.at(i)->Fill(sumEinLayer[i], sumEinCryoBack + sumEinCryoLArBathBack);
     verbose() << "Energy deposited in layer " << i << ": " << sumEinLayer[i] << " GeV" << endmsg;
   }
   m_hSumEinLayers->Fill(sumEinCalo);

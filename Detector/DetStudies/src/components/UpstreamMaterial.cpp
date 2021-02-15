@@ -100,6 +100,15 @@ StatusCode UpstreamMaterial::initialize() {
     return StatusCode::FAILURE;
   }
 
+  m_hEnergyInCaloAndCryo = new TH1F("energyInCaloAndCryo",
+                                    "Energy deposited in calorimeter and in cryostat;E [GeV];N_{evt}",
+                                    200, 0., 0.);
+  m_hEnergyInCaloAndCryo->Sumw2();
+  if (m_histSvc->regHist("/det/energyInCaloAndCryo", m_hEnergyInCaloAndCryo).isFailure()) {
+    error() << "Couldn't register histogram \"EnergyInCaloAndCryo\"!" << endmsg;
+    return StatusCode::FAILURE;
+  }
+
   m_hEnergyInCryo = new TH1F("energyInCryo",
                              "Energy deposited in cryostat;E [GeV];N_{evt}",
                              200, 0., 0.);
@@ -270,6 +279,7 @@ StatusCode UpstreamMaterial::execute() {
     verbose() << "Energy deposited in layer " << i << ": " << sumEinLayer[i] << " GeV" << endmsg;
   }
   m_hSumEinLayers->Fill(sumEinCalo);
+  m_hEnergyInCaloAndCryo->Fill(sumEinCalo + sumEinCryo);
   verbose() << "Sum of energy deposited in all calorimeter layers: " << sumEinCalo << " GeV" << endmsg;
 
   m_hEnergyInCryo->Fill(sumEinCryo);
@@ -284,6 +294,7 @@ StatusCode UpstreamMaterial::execute() {
   verbose() << "Energy deposited in the cryostat sides: " << sumEinCryoSides << " GeV" << endmsg;
   verbose() << "Energy deposited in the cryostat LAr bath front: " << sumEinCryoLArBathFront << " GeV" << endmsg;
   verbose() << "Energy deposited in the cryostat LAr bath back: " << sumEinCryoLArBathBack << " GeV" << endmsg;
+  verbose() << "Energy deposited in the calorimeter and in the cryostat: " << sumEinCalo + sumEinCryo << " GeV" << endmsg;
 
   return StatusCode::SUCCESS;
 }

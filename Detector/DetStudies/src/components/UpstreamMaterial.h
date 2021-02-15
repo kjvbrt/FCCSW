@@ -78,6 +78,8 @@ private:
   TH1F* m_hEnergyInLayers;
   /// Pointer to histogram with sum of energy deposited in all calorimeter layers
   TH1F* m_hSumEinLayers;
+  /// Pointer to histogram with energy deposited in the calorimeter and in the cryostat
+  TH1F* m_hEnergyInCaloAndCryo;
   /// Pointer to histogram with energy deposited in cryostat
   TH1F* m_hEnergyInCryo;
   /// Pointer to histogram with energy deposited in cryostat front

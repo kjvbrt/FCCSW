@@ -1,5 +1,5 @@
-#ifndef DETSTUDIES_UPSTREAMMATERIAL_H
-#define DETSTUDIES_UPSTREAMMATERIAL_H
+#ifndef DETSTUDIES_UPSTREAMDOWNSTREAMMATERIAL_H
+#define DETSTUDIES_UPSTREAMDOWNSTREAMMATERIAL_H
 
 // GAUDI
 #include "GaudiAlg/GaudiAlgorithm.h"
@@ -19,23 +19,23 @@ class TH1F;
 class TGraph;
 class ITHistSvc;
 
-/** @class UpstreamMaterial UpstreamMaterial.h
+/** @class UpstreamDownstreamMaterial UpstreamDownstreamMaterial.h
  *
- * Histograms of energy deposited in the dead material of the calorimeter.
- * Cryostat material needs to be marked as sensitive (and therefore ID 'cryo'==1).
- * Dependence of the energy deposited in the dead material on the energy deposited in each calorimeter layer is
- * plotted.
- * Dependence of the energy deposited in the dead material on the azimuthal angle of the incoming particle (MC truth)
- * is plotted.
+ *  Histograms of energy deposited in the dead material of the calorimeter (cryostat).
+ *  Cryostat material needs to be marked as sensitive (and therefore ID 'cryo'==1).
+ *  Dependence of the energy deposited in the dead material (front and back cryostat) on the energy deposited in each
+ *  calorimeter layer is plotted.
+ *  Dependence of the energy deposited in the dead material on the azimuthal angle of the incoming particle (MC truth)
+ *  is plotted.
  *
  *  @author Anna Zaborowska
  *  @author Juraj Smiesko
  */
 
-class UpstreamMaterial : public GaudiAlgorithm {
+class UpstreamDownstreamMaterial : public GaudiAlgorithm {
 public:
-  explicit UpstreamMaterial(const std::string&, ISvcLocator*);
-  virtual ~UpstreamMaterial();
+  explicit UpstreamDownstreamMaterial(const std::string&, ISvcLocator*);
+  virtual ~UpstreamDownstreamMaterial();
   /**  Initialize.
    *   @return status code
    */
@@ -114,4 +114,5 @@ private:
   /// Name of the detector readout
   Gaudi::Property<std::string> m_readoutName{this, "readoutName", "", "Name of the readout"};
 };
-#endif /* DETSTUDIES_UPSTREAMMATERIAL_H */
+
+#endif /* DETSTUDIES_UPSTREAMDOWNSTREAMMATERIAL_H */

@@ -85,18 +85,19 @@ createcellsBarrel = CreateCaloCells("CreateCaloCellsBarrel",
 createcellsBarrel.hits.Path="ECalBarrelHits"
 createcellsBarrel.cells.Path="ECalBarrelCells"
 
-from Configurables import UpstreamMaterial
-hist = UpstreamMaterial("histsPresampler",
-                        energyAxis=momentum,
-                        phiAxis=0.1,
-                        readoutName="ECalBarrelEta",
-                        layerFieldName="layer",
-                        numLayers=8,
-                        # sampling fraction is given as the upstream correction will be applied on calibrated cells
-                        samplingFraction=samplingFractions,
-                        OutputLevel=VERBOSE)
-hist.deposits.Path="ECalBarrelCells"
-hist.particle.Path="GenParticles"
+from Configurables import UpstreamDownstreamMaterial
+hist = UpstreamDownstreamMaterial("histsPresampler",
+                                  energyAxis=momentum,
+                                  phiAxis=0.1,
+                                  readoutName="ECalBarrelEta",
+                                  layerFieldName="layer",
+                                  numLayers=8,
+                                  # sampling fraction is given as the upstream correction will be applied on calibrated
+                                  # cells
+                                  samplingFraction=samplingFractions,
+                                  OutputLevel=VERBOSE)
+hist.deposits.Path = "ECalBarrelCells"
+hist.particle.Path = "GenParticles"
 
 THistSvc().Output = ["det DATAFILE='histUpstream_fccee_hits_%ideg_%iGeV.root' TYP='ROOT' OPT='RECREATE'" % (theta, momentum)]
 THistSvc().PrintAll=True

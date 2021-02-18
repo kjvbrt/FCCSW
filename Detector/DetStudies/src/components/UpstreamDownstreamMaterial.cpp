@@ -1,4 +1,4 @@
-#include "UpstreamMaterial.h"
+#include "UpstreamDownstreamMaterial.h"
 
 // FCCSW
 #include "DetInterface/IGeoSvc.h"
@@ -18,15 +18,21 @@
 #include "DD4hep/Detector.h"
 #include "DD4hep/Readout.h"
 
-DECLARE_COMPONENT(UpstreamMaterial)
 
-UpstreamMaterial::UpstreamMaterial(const std::string& aName, ISvcLocator* aSvcLoc) : GaudiAlgorithm(aName, aSvcLoc), m_geoSvc("GeoSvc", aName) {
+DECLARE_COMPONENT(UpstreamDownstreamMaterial)
+
+
+UpstreamDownstreamMaterial::UpstreamDownstreamMaterial(const std::string& aName, ISvcLocator* aSvcLoc)
+    : GaudiAlgorithm(aName, aSvcLoc), m_geoSvc("GeoSvc", aName) {
   declareProperty("deposits", m_deposits, "Energy deposits (input)");
   declareProperty("particle", m_particle, "Generated single-particle event (input)");
 }
-UpstreamMaterial::~UpstreamMaterial() {}
 
-StatusCode UpstreamMaterial::initialize() {
+
+UpstreamDownstreamMaterial::~UpstreamDownstreamMaterial() {}
+
+
+StatusCode UpstreamDownstreamMaterial::initialize() {
   if (GaudiAlgorithm::initialize().isFailure()) return StatusCode::FAILURE;
 
   // Check geometry service
@@ -198,7 +204,8 @@ StatusCode UpstreamMaterial::initialize() {
   return StatusCode::SUCCESS;
 }
 
-StatusCode UpstreamMaterial::execute() {
+
+StatusCode UpstreamDownstreamMaterial::execute() {
   verbose() << "Event Number: " << m_gUpstreamEnergyCellEnergy.front()->GetN() << endmsg;
 
   auto decoder = m_geoSvc->lcdd()->readout(m_readoutName).idSpec().decoder();
@@ -300,7 +307,7 @@ StatusCode UpstreamMaterial::execute() {
 }
 
 
-StatusCode UpstreamMaterial::finalize() {
+StatusCode UpstreamDownstreamMaterial::finalize() {
   size_t nEvt = m_gUpstreamEnergyCellEnergy.front()->GetN();
   size_t nBin = std::sqrt(nEvt) + 1;
   verbose() << "Number of generated events: " << nEvt << endmsg;
@@ -334,7 +341,7 @@ StatusCode UpstreamMaterial::finalize() {
 }
 
 
-void UpstreamMaterial::GraphToHist(TGraph* graph, TH2F* hist) {
+void UpstreamDownstreamMaterial::GraphToHist(TGraph* graph, TH2F* hist) {
   for (int i = 0; i < graph->GetN(); ++i) {
     hist->Fill(graph->GetPointX(i), graph->GetPointY(i));
   }

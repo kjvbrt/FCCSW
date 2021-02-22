@@ -86,11 +86,10 @@ createcellsBarrel.hits.Path="ECalBarrelHits"
 createcellsBarrel.cells.Path="ECalBarrelCells"
 
 from Configurables import UpstreamDownstreamMaterial
-hist = UpstreamDownstreamMaterial("histsPresampler",
+hist = UpstreamDownstreamMaterial("histsUpDownMaterial",
                                   energyAxis=momentum,
                                   phiAxis=0.1,
                                   readoutName="ECalBarrelEta",
-                                  layerFieldName="layer",
                                   numLayers=8,
                                   # sampling fraction is given as the upstream correction will be applied on calibrated
                                   # cells

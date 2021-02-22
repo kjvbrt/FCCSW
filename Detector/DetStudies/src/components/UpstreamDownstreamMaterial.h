@@ -50,10 +50,6 @@ public:
   virtual StatusCode finalize() final;
 
 private:
-  /**
-   *  Convert graph to hist
-   */
-  void GraphToHist(TGraph* graph, TH2F* hist);
   // Energy range in the histogram axis
   Gaudi::Property<double> m_energy{this, "energyAxis", 100, "Max energy for the axis of plot"};
   // Phi in the histogram axis
@@ -66,14 +62,14 @@ private:
   SmartIF<ITHistSvc> m_histSvc;
   /// Pointer to the geometry service
   ServiceHandle<IGeoSvc> m_geoSvc;
-  /// Pointer to the graphs showing upstream energy vs energy deposited in every layer
-  std::vector<TGraph*> m_gUpstreamEnergyCellEnergy;
+
   /// Pointer to the histograms showing upstream energy vs energy deposited in every layer
-  std::vector<TH2F*> m_upstreamEnergyCellEnergy;
+  std::vector<TH2F*> m_hUpstreamEnergyEnergyInLayer;
   /// Pointer to the histograms showing downstream energy vs energy deposited in every layer
-  std::vector<TH2F*> m_downstreamEnergyEnergyInLayer;
+  std::vector<TH2F*> m_hDownstreamEnergyEnergyInLayer;
   /// Pointer to histograms showing the energy in Phi
-  std::vector<TH1F*> m_cellEnergyPhi;
+  std::vector<TH1F*> m_hEnergyInLayerPhi;
+
   /// Pointer to histogram with energy deposited in calorimeter layers
   TH1F* m_hEnergyInLayers;
   /// Pointer to histogram with sum of energy deposited in all calorimeter layers
@@ -100,12 +96,11 @@ private:
   TH2F* m_hHitPositionXY;
   /// Pointer to histogram showing hit position in ZY plane (r is assumed to be 1)
   TH2F* m_hHitPositionZY;
-  /// Name of the active field
-  Gaudi::Property<std::string> m_activeFieldName{this, "activeFieldName", "active", "Name of active field"};
-  /// Name of the cells/layer field
-  Gaudi::Property<std::string> m_layerFieldName{this, "layerFieldName", "layer", "Name of layer"};
+
+  /// Number of bins to be used in 2D histograms
+  Gaudi::Property<int> m_nBins{this, "numberOfBins", 50, "Number of bins"};
   /// Number of layers/cells cells
-  Gaudi::Property<uint> m_numLayers{this, "numLayers", 8, "Number of layers"};
+  Gaudi::Property<size_t> m_numLayers{this, "numLayers", 8, "Number of layers"};
   /// Id of the first layer (current design starts layer ids at 0)
   Gaudi::Property<uint> m_firstLayerId{this, "firstLayerId", 0, "ID of first layer"};
   /// Values of sampling fraction

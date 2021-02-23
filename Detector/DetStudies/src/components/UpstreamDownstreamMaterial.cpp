@@ -7,8 +7,12 @@
 #include "datamodel/CaloHitCollection.h"
 #include "datamodel/MCParticleCollection.h"
 
+// Gaudi
 #include "CLHEP/Vector/ThreeVector.h"
 #include "GaudiKernel/ITHistSvc.h"
+#include "GaudiKernel/GaudiException.h"
+
+// ROOT
 #include "TH1F.h"
 #include "TH2F.h"
 #include "TGraph.h"
@@ -124,21 +128,12 @@ StatusCode UpstreamDownstreamMaterial::initialize() {
     return StatusCode::FAILURE;
   }
 
-  m_hSumEinLayers = new TH1F("sumEinLayers",
+  m_hEnergyInCalo = new TH1F("energyInCalo",
                              "Sum of energy deposited in all layers;E [GeV];N_{evt}",
                              200, 0., 0.);
-  m_hSumEinLayers->Sumw2();
-  if (m_histSvc->regHist("/det/sumEinLayers", m_hSumEinLayers).isFailure()) {
-    error() << "Couldn't register histogram \"sumEinLayers\"!" << endmsg;
-    return StatusCode::FAILURE;
-  }
-
-  m_hEnergyInCaloAndCryo = new TH1F("energyInCaloAndCryo",
-                                    "Energy deposited in calorimeter and in cryostat;E [GeV];N_{evt}",
-                                    200, 0., 0.);
-  m_hEnergyInCaloAndCryo->Sumw2();
-  if (m_histSvc->regHist("/det/energyInCaloAndCryo", m_hEnergyInCaloAndCryo).isFailure()) {
-    error() << "Couldn't register histogram \"EnergyInCaloAndCryo\"!" << endmsg;
+  m_hEnergyInCalo->Sumw2();
+  if (m_histSvc->regHist("/det/energyInCalo", m_hEnergyInCalo).isFailure()) {
+    error() << "Couldn't register histogram \"energyInCalo\"!" << endmsg;
     return StatusCode::FAILURE;
   }
 
@@ -228,6 +223,46 @@ StatusCode UpstreamDownstreamMaterial::initialize() {
     return StatusCode::FAILURE;
   }
 
+
+  m_hEnergyInCaloAndCryo = new TH1F("energyInCaloAndCryo",
+                                    "Energy deposited in calorimeter and in cryostat;E [GeV];N_{evt}",
+                                    200, 0., 0.);
+  m_hEnergyInCaloAndCryo->Sumw2();
+  if (m_histSvc->regHist("/det/energyInCaloAndCryo", m_hEnergyInCaloAndCryo).isFailure()) {
+    error() << "Couldn't register histogram \"EnergyInCaloAndCryo\"!" << endmsg;
+    return StatusCode::FAILURE;
+  }
+
+  m_hEnergyInCaloAndCryoFront = new TH1F("energyInCaloAndCryoFront",
+                                        "Energy deposited in calorimeter and in cryostat front;E [GeV];N_{evt}",
+                                        200, 0., 0.);
+  m_hEnergyInCaloAndCryoFront->Sumw2();
+  if (m_histSvc->regHist("/det/energyInCaloAndCryoFront", m_hEnergyInCaloAndCryoFront).isFailure()) {
+    error() << "Couldn't register histogram \"EnergyInCaloAndCryoFront\"!" << endmsg;
+    return StatusCode::FAILURE;
+  }
+
+  m_hEnergyInCaloAndCryoBack = new TH1F("energyInCaloAndCryoBack",
+                                        "Energy deposited in calorimeter and in cryostat back;E [GeV];N_{evt}",
+                                        200, 0., 0.);
+  m_hEnergyInCaloAndCryoBack->Sumw2();
+  if (m_histSvc->regHist("/det/energyInCaloAndCryoBack", m_hEnergyInCaloAndCryoBack).isFailure()) {
+    error() << "Couldn't register histogram \"EnergyInCaloAndCryoBack\"!" << endmsg;
+    return StatusCode::FAILURE;
+  }
+
+
+  m_hEnergyInCaloAndUpCorr = bookHisto1D("energyInCaloAndUpCorr",
+                                         "Energy deposited in calorimeter and upstream correction;E [GeV];N_{evt}",
+                                         200, 0., 0.);
+  m_hEnergyInCaloAndDownCorr = bookHisto1D("energyInCaloAndDownCorr",
+                                           "Energy deposited in calorimeter and downstream correction;E [GeV];N_{evt}",
+                                           200, 0., 0.);
+  m_hEnergyInCaloAndUpDownCorr = bookHisto1D(
+      "energyInCaloAndUpDownCorr",
+      "Energy deposited in calorimeter and up/downstream correction;E [GeV];N_{evt}",
+      200, 0., 0.);
+
   return StatusCode::SUCCESS;
 }
 
@@ -308,8 +343,7 @@ StatusCode UpstreamDownstreamMaterial::execute() {
     m_hDownstreamEnergyEnergyInLayer.at(i)->Fill(sumEinLayer[i], sumEinCryoBack + sumEinCryoLArBathBack);
     m_hEnergyInLayers->Fill(i, sumEinLayer[i]);
   }
-  m_hSumEinLayers->Fill(sumEinCalo);
-  m_hEnergyInCaloAndCryo->Fill(sumEinCalo + sumEinCryo);
+  m_hEnergyInCalo->Fill(sumEinCalo);
   m_hEnergyInCryo->Fill(sumEinCryo);
   m_hEnergyInCryoFront->Fill(sumEinCryoFront);
   m_hEnergyInCryoBack->Fill(sumEinCryoBack);
@@ -317,18 +351,47 @@ StatusCode UpstreamDownstreamMaterial::execute() {
   m_hEnergyInCryoLArBathFront->Fill(sumEinCryoLArBathFront);
   m_hEnergyInCryoLArBathBack->Fill(sumEinCryoLArBathBack);
 
-  for (size_t i = 0; i < m_numLayers; ++i) {
-    verbose() << "Energy deposited in layer " << i << ": " << sumEinLayer[i] << " GeV" << endmsg;
-  }
-  verbose() << "Sum of energy deposited in all calorimeter layers: " << sumEinCalo << " GeV" << endmsg;
-  verbose() << "Energy deposited in the cryostat: " << sumEinCryo << " GeV" << endmsg;
-  verbose() << "Energy deposited in the cryostat front: " << sumEinCryoFront << " GeV" << endmsg;
-  verbose() << "Energy deposited in the cryostat back: " << sumEinCryoBack<< " GeV" << endmsg;
-  verbose() << "Energy deposited in the cryostat sides: " << sumEinCryoSides << " GeV" << endmsg;
-  verbose() << "Energy deposited in the cryostat LAr bath front: " << sumEinCryoLArBathFront << " GeV" << endmsg;
-  verbose() << "Energy deposited in the cryostat LAr bath back: " << sumEinCryoLArBathBack << " GeV" << endmsg;
-  verbose() << "Energy deposited in the calorimeter and in the cryostat: " << sumEinCalo + sumEinCryo << " GeV" << endmsg;
+  m_hEnergyInCaloAndCryo->Fill(sumEinCalo + sumEinCryo);
+  m_hEnergyInCaloAndCryoFront->Fill(sumEinCalo + sumEinCryoFront + sumEinCryoLArBathFront);
+  m_hEnergyInCaloAndCryoBack->Fill(sumEinCalo + sumEinCryoBack + sumEinCryoLArBathBack);
 
+  double downstreamEnergy = getDownstreamCorr(sumEinLayer[m_numLayers - 1], sumEinCalo);
+  double upstreamEnergy = getUpstreamCorr(sumEinLayer[0], sumEinCalo + downstreamEnergy);
+  m_hEnergyInCaloAndUpCorr->Fill(sumEinCalo + upstreamEnergy);
+  m_hEnergyInCaloAndDownCorr->Fill(sumEinCalo + downstreamEnergy);
+  m_hEnergyInCaloAndUpDownCorr->Fill(sumEinCalo + upstreamEnergy + downstreamEnergy);
+
+  // Printouts
+  verbose() << "********************************************************************" << endmsg;
+  verbose() << "Event num: " << m_hEnergyInCalo->GetEntries() << endmsg;
+  verbose() << "Energy in layers:" << endmsg;
+  for (size_t i = 0; i < m_numLayers; ++i) {
+    verbose() << "  * layer " << i << ": " << sumEinLayer[i] << " GeV" << endmsg;
+  }
+
+  verbose() << "Energy in calorimeter: " << sumEinCalo << " GeV" << endmsg;
+  verbose() << "Energy in cryostat: " << sumEinCryo << " GeV" << endmsg;
+  verbose() << "Energy in cryostat front: " << sumEinCryoFront << " GeV" << endmsg;
+  verbose() << "Energy in cryostat back: " << sumEinCryoBack << " GeV" << endmsg;
+  verbose() << "Energy in cryostat sides: " << sumEinCryoSides << " GeV" << endmsg;
+  verbose() << "Energy in cryostat LAr bath front: " << sumEinCryoLArBathFront << " GeV" << endmsg;
+  verbose() << "Energy in cryostat LAr bath back: " << sumEinCryoLArBathBack << " GeV" << endmsg << endmsg;
+
+  verbose() << "Energy in calorimeter and in the cryostat: " << sumEinCalo + sumEinCryo << " GeV" << endmsg;
+  verbose() << "Energy in calorimeter and in the cryostat front: "
+            << sumEinCalo + sumEinCryoFront + sumEinCryoLArBathFront << " GeV" << endmsg;
+  verbose() << "Energy in calorimeter and in the cryostat back: "
+            << sumEinCalo + sumEinCryoBack + sumEinCryoLArBathBack << " GeV" << endmsg << endmsg;
+
+  verbose() << "Upstream correction: " << upstreamEnergy << " GeV" << endmsg;
+  verbose() << "Downstream correction: " << downstreamEnergy << " GeV" << endmsg;
+  verbose() << "Upstream and downstream correction: " << upstreamEnergy + downstreamEnergy << " GeV" << endmsg
+            << endmsg;
+
+  verbose() << "Energy in calorimeter and upstream corr.: " << sumEinCalo + upstreamEnergy << " GeV" << endmsg;
+  verbose() << "Energy in calorimeter and downstream corr.: " << sumEinCalo + downstreamEnergy << " GeV" << endmsg;
+  verbose() << "Energy in calorimeter and up/downstream corr.: "
+            << sumEinCalo + upstreamEnergy + downstreamEnergy << " GeV" << endmsg << endmsg;
   return StatusCode::SUCCESS;
 }
 
@@ -339,8 +402,7 @@ StatusCode UpstreamDownstreamMaterial::finalize() {
     m_hDownstreamEnergyEnergyInLayer.at(i)->BufferEmpty();
   }
 
-  m_hSumEinLayers->BufferEmpty();
-  m_hEnergyInCaloAndCryo->BufferEmpty();
+  m_hEnergyInCalo->BufferEmpty();
   m_hEnergyInCryo->BufferEmpty();
   m_hEnergyInCryoFront->BufferEmpty();
   m_hEnergyInCryoBack->BufferEmpty();
@@ -350,5 +412,69 @@ StatusCode UpstreamDownstreamMaterial::finalize() {
   m_hParticleMomentumXY->BufferEmpty();
   m_hParticleMomentumZY->BufferEmpty();
 
+  m_hEnergyInCaloAndCryo->BufferEmpty();
+  m_hEnergyInCaloAndCryoFront->BufferEmpty();
+  m_hEnergyInCaloAndCryoBack->BufferEmpty();
+
+  m_hEnergyInCaloAndUpCorr->BufferEmpty();
+  m_hEnergyInCaloAndDownCorr->BufferEmpty();
+  m_hEnergyInCaloAndUpDownCorr->BufferEmpty();
+
   return GaudiAlgorithm::finalize();
+}
+
+
+double UpstreamDownstreamMaterial::getUpstreamCorr(double energyInFirstLayer, double clusterEnergy) {
+  double a = 0.03248;
+  double b = 0.0001858;
+  double c = 1.293;
+  double d = -0.9203;
+
+  double upsilon0 = a + b * clusterEnergy;
+  double upsilon1 = c + d / std::sqrt(clusterEnergy);
+
+  return upsilon0 + upsilon1 * energyInFirstLayer;
+}
+
+
+double UpstreamDownstreamMaterial::getDownstreamCorr(double energyInLastLayer, double clusterEnergy) {
+  // normal cryo back
+  double a = 0.006364;
+  double b = 0.00112;
+  double c = 0.3906;
+  double d = -0.5872;
+  double e = -0.002914;
+  double f = 1.89;
+  double g = 0.;
+  // large cryo back
+  /*
+  double a = 0.01324;
+  double b = 0.002386;
+  double c = 0.7686;
+  double d = -1.385;
+  double e = 0.001384;
+  double f = 3.454;
+  double g = 6.638;
+  */
+
+  double delta0 = a + b * clusterEnergy;
+  double delta1 = c + d / std::sqrt(clusterEnergy);
+  double delta2 = e + f / (clusterEnergy - g);
+
+  return delta0 + delta1 * energyInLastLayer + delta2 * std::pow(energyInLastLayer, 2);
+}
+
+
+TH1F* UpstreamDownstreamMaterial::bookHisto1D(const std::string& histName, const std::string& histTitle,
+                                              size_t nBins, double xMin, double xMax) {
+  TH1F* hist = new TH1F(histName.c_str(), histTitle.c_str(), nBins, xMin, xMax);
+  hist->Sumw2();
+
+  if (m_histSvc->regHist(("/det/" + histName).c_str(), hist).isFailure()) {
+    throw GaudiException("Couldn't register histogram \"" + histName + "\"!",
+                         "histogram booking error",
+                         StatusCode::FAILURE);
+  }
+
+  return hist;
 }

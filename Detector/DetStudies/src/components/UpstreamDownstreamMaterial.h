@@ -50,6 +50,9 @@ public:
   virtual StatusCode finalize() final;
 
 private:
+  double getUpstreamCorr(double energyInFirstLayer, double clusterEnergy);
+  double getDownstreamCorr(double energyInLastLayer, double clusterEnergy);
+  TH1F* bookHisto1D(const std::string& histName, const std::string& histTitle, size_t nBins, double xMin, double xMax);
   // Energy range in the histogram axis
   Gaudi::Property<double> m_energy{this, "energyAxis", 100, "Max energy for the axis of plot"};
   // Phi in the histogram axis
@@ -73,9 +76,7 @@ private:
   /// Pointer to histogram with energy deposited in calorimeter layers
   TH1F* m_hEnergyInLayers;
   /// Pointer to histogram with sum of energy deposited in all calorimeter layers
-  TH1F* m_hSumEinLayers;
-  /// Pointer to histogram with energy deposited in the calorimeter and in the cryostat
-  TH1F* m_hEnergyInCaloAndCryo;
+  TH1F* m_hEnergyInCalo;
   /// Pointer to histogram with energy deposited in cryostat
   TH1F* m_hEnergyInCryo;
   /// Pointer to histogram with energy deposited in cryostat front
@@ -96,6 +97,19 @@ private:
   TH2F* m_hHitPositionXY;
   /// Pointer to histogram showing hit position in ZY plane (r is assumed to be 1)
   TH2F* m_hHitPositionZY;
+
+  /// Pointer to histogram with energy deposited in the calorimeter and in the cryostat
+  TH1F* m_hEnergyInCaloAndCryo;
+  /// Pointer to histogram with energy deposited in the calorimeter and in the cryostat front
+  TH1F* m_hEnergyInCaloAndCryoFront;
+  /// Pointer to histogram with energy deposited in the calorimeter and in the cryostat back
+  TH1F* m_hEnergyInCaloAndCryoBack;
+  /// Pointer to histogram with energy deposited in the calorimeter plus upstream correction
+  TH1F* m_hEnergyInCaloAndUpCorr;
+  /// Pointer to histogram with energy deposited in the calorimeter plus downstream correction
+  TH1F* m_hEnergyInCaloAndDownCorr;
+  /// Pointer to histogram with energy deposited in the calorimeter plus upstream and downstream correction
+  TH1F* m_hEnergyInCaloAndUpDownCorr;
 
   /// Number of bins to be used in 2D histograms
   Gaudi::Property<int> m_nBins{this, "numberOfBins", 50, "Number of bins"};

@@ -93,17 +93,24 @@ private:
   TH2F* m_hParticleMomentumXY;
   /// Pointer to histogram showing particle momentum in ZY plane
   TH2F* m_hParticleMomentumZY;
-  /// Pointer to histogram showing hit position in XY plane (r is assumed to be 1)
-  TH2F* m_hHitPositionXY;
-  /// Pointer to histogram showing hit position in ZY plane (r is assumed to be 1)
-  TH2F* m_hHitPositionZY;
 
   /// Pointer to histogram with energy deposited in the calorimeter and in the cryostat
   TH1F* m_hEnergyInCaloAndCryo;
-  /// Pointer to histogram with energy deposited in the calorimeter and in the cryostat front
+  /// Pointer to histogram with energy deposited in the calorimeter and in the cryostat front (+ LAr bath front)
   TH1F* m_hEnergyInCaloAndCryoFront;
-  /// Pointer to histogram with energy deposited in the calorimeter and in the cryostat back
+  /// Pointer to histogram with energy deposited in the calorimeter and in the cryostat back (+ LAr bath back)
   TH1F* m_hEnergyInCaloAndCryoBack;
+  /// Pointer to histogram with energy deposited in front cryostat and in front LAr bath
+  TH1F* m_hEnergyInCryoFrontAndLArBathFront;
+  /// Pointer to histogram with energy deposited in back cryostat and in back LAr bath
+  TH1F* m_hEnergyInCryoBackAndLArBathBack;
+
+  /// Pointer to histogram with energy from upstream correction
+  TH1F* m_hEnergyFromUpCorr;
+  /// Pointer to histogram with energy from downstream correction
+  TH1F* m_hEnergyFromDownCorr;
+  /// Pointer to histogram with energy from up/downstream correction
+  TH1F* m_hEnergyFromUpDownCorr;
   /// Pointer to histogram with energy deposited in the calorimeter plus upstream correction
   TH1F* m_hEnergyInCaloAndUpCorr;
   /// Pointer to histogram with energy deposited in the calorimeter plus downstream correction

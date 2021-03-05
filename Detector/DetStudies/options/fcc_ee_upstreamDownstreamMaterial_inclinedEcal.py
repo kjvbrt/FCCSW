@@ -4,20 +4,24 @@ from GaudiKernel.SystemOfUnits import MeV, GeV
 
 # Electron momentum in GeV
 momentum = 50
-# Theta min and max in degrees
+# Theta and its spread in degrees
 theta = 90.
-thetaSpread = 5.
-thetaMin = theta - thetaSpread
-thetaMax = theta + thetaSpread
+thetaSpread = 10.
 
 samplingFractions = [0.24833, 0.09482, 0.12242, 0.14182, 0.15667, 0.16923, 0.17980, 0.20085]
 # samplingFractions = [0.12125] + [0.14283] + [0.16354] + [0.17662] + [0.18867] + [0.19890] + [0.20637] + [0.20802]
+
+#---------------------------------------------------------------------------------------------------------------------
+
+# Random string for output files
+import uuid
+rndstr = uuid.uuid4().hex[0:16]
 
 # Data service
 from Configurables import FCCDataSvc
 podioevent = FCCDataSvc("EventDataSvc")
 
-################## Particle gun setup
+# Particle gun setup
 _pi = 3.14159
 
 from Configurables import  MomentumRangeParticleGun
@@ -28,8 +32,8 @@ pgun.MomentumMax = momentum * GeV
 pgun.PhiMin = 0
 pgun.PhiMax = 2 * _pi
 # theta = 90 degrees (eta = 0)
-pgun.ThetaMin = thetaMin * _pi / 180.
-pgun.ThetaMax = thetaMax * _pi / 180.
+pgun.ThetaMin = (theta - thetaSpread/2) * _pi / 180.
+pgun.ThetaMax = (theta + thetaSpread/2) * _pi / 180.
 
 from Configurables import GenAlg
 genalg_pgun = GenAlg()
@@ -44,10 +48,9 @@ hepmc_converter.genvertices.Path="GenVertices"
 
 # DD4hep geometry service
 from Configurables import GeoSvc
-geoservice = GeoSvc("GeoSvc", detectors=['file:Detector/DetFCCeeIDEA-LAr/compact/FCCee_DectEmptyMaster.xml',
-                                         'file:Detector/DetFCCeeECalInclined/compact/FCCee_ECalBarrel_upstream.xml'],
-# geoservice = GeoSvc("GeoSvc", detectors=['file:Detector/DetFCChhBaseline1/compact/FCChh_DectEmptyMaster.xml',
-#                                          'file:Detector/DetFCChhECalInclined/compact/FCChh_ECalBarrel_upstream.xml'],
+geoservice = GeoSvc("GeoSvc",
+                    detectors=['file:Detector/DetFCCeeIDEA-LAr/compact/FCCee_DectEmptyMaster.xml',
+                               'file:Detector/DetFCCeeECalInclined/compact/FCCee_ECalBarrel_upstream.xml'],
                     OutputLevel = INFO)
 
 # Geant4 service
@@ -98,13 +101,14 @@ hist = UpstreamDownstreamMaterial("histsUpDownMaterial",
 hist.deposits.Path = "ECalBarrelCells"
 hist.particle.Path = "GenParticles"
 
-THistSvc().Output = ["det DATAFILE='histUpstream_fccee_hits_%ideg_%iGeV.root' TYP='ROOT' OPT='RECREATE'" % (theta, momentum)]
+THistSvc().Output = ["det DATAFILE='histUpstream_fccee_hits_%ideg_%iGeV_%s.root' TYP='ROOT' OPT='RECREATE'" %
+                     (theta, momentum, rndstr)]
 THistSvc().PrintAll=True
 THistSvc().AutoSave=True
 THistSvc().AutoFlush=True
 THistSvc().OutputLevel=INFO
 
-#CPU information
+# Print CPU information
 from Configurables import AuditorSvc, ChronoAuditor
 chra = ChronoAuditor()
 audsvc = AuditorSvc()
@@ -116,7 +120,7 @@ from Configurables import PodioOutput
 ### PODIO algorithm
 out = PodioOutput("out", OutputLevel=INFO)
 out.outputCommands = ["drop *"]
-out.filename = "fccee_upstreamMaterial_inclinedEcal_%ideg_%iGeV.root" % (theta, momentum)
+out.filename = "fccee_upstreamMaterial_inclinedEcal_%ideg_%iGeV_%s.root" % (theta, momentum, rndstr)
 
 # ApplicationMgr
 from Configurables import ApplicationMgr

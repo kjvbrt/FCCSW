@@ -30,6 +30,10 @@ UpstreamDownstreamMaterial::UpstreamDownstreamMaterial(const std::string& aName,
     : GaudiAlgorithm(aName, aSvcLoc), m_geoSvc("GeoSvc", aName) {
   declareProperty("deposits", m_deposits, "Energy deposits (input)");
   declareProperty("particle", m_particle, "Generated single-particle event (input)");
+
+  declareProperty("energyInLayer", m_energyInLayer, "Energy deposited in every calorimeter layer (output)");
+  declareProperty("energyInCryo", m_energyInCryo, "Energy deposited in cryostat parts (output)");
+  declareProperty("particleVec", m_particleVec, "Initial particle momentum vector (output)");
 }
 
 
@@ -190,6 +194,15 @@ StatusCode UpstreamDownstreamMaterial::initialize() {
 StatusCode UpstreamDownstreamMaterial::execute() {
   auto decoder = m_geoSvc->lcdd()->readout(m_readoutName).idSpec().decoder();
 
+  // Initialize output variables
+  std::vector<double>* energyInLayer = m_energyInLayer.createAndPut();
+  energyInLayer->assign(m_numLayers, 0.);
+  std::vector<double>* energyInCryo = m_energyInCryo.createAndPut();
+  energyInCryo->assign(6, 0.);
+  std::vector<double>* particleVec = m_particleVec.createAndPut();
+  particleVec->assign(3, 0.);
+
+
   // Check MC phi angle
   const auto particle = m_particle.get();
   double phi = 0;
@@ -197,6 +210,9 @@ StatusCode UpstreamDownstreamMaterial::execute() {
     phi = atan2(part.core().p4.py, part.core().p4.px);
     m_hParticleMomentumXY->Fill(part.core().p4.px, part.core().p4.py);
     m_hParticleMomentumZY->Fill(part.core().p4.pz, part.core().p4.py);
+    particleVec->at(0) = part.core().p4.px;
+    particleVec->at(1) = part.core().p4.py;
+    particleVec->at(2) = part.core().p4.pz;
   }
 
   // Get the energy deposited in the cryostat(s) and in the detector (each layer)
@@ -215,8 +231,10 @@ StatusCode UpstreamDownstreamMaterial::execute() {
     if (cryoId == 0) {
       size_t layerId = decoder->get(cellId, "layer");
       sumEinLayer[layerId] += hit.core().energy;
+      energyInLayer->at(layerId) += hit.core().energy;
     } else {
       sumEinCryo += hit.core().energy;
+      energyInCryo->at(0) += hit.core().energy;
       size_t cryoTypeId = decoder->get(cellId, "type");
       switch(cryoTypeId) {
         case 1: sumEinCryoFront += hit.core().energy;
@@ -231,6 +249,7 @@ StatusCode UpstreamDownstreamMaterial::execute() {
                 break;
         default: warning() << "Wrong cryostat type ID found!\ncryoTypeId: " << cryoTypeId << endmsg;
       }
+      energyInCryo->at(cryoTypeId) += hit.core().energy;
     }
   }
 

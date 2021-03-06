@@ -53,6 +53,18 @@ private:
   double getUpstreamCorr(double energyInFirstLayer, double clusterEnergy);
   double getDownstreamCorr(double energyInLastLayer, double clusterEnergy);
   TH1F* bookHisto1D(const std::string& histName, const std::string& histTitle, size_t nBins, double xMin, double xMax);
+  /// Handle for vector with energy deposited in every layer
+  DataHandle<std::vector<double>> m_energyInLayer {
+      "energyInLayer", Gaudi::DataHandle::Writer, this
+  };
+  /// Handle for vector with energy deposited in cryostat parts
+  DataHandle<std::vector<double>> m_energyInCryo {
+      "energyInCryo", Gaudi::DataHandle::Writer, this
+  };
+  /// Handle for initial particle vector
+  DataHandle<std::vector<double>> m_particleVec {
+      "particleVec", Gaudi::DataHandle::Writer, this
+  };
   // Energy range in the histogram axis
   Gaudi::Property<double> m_energy{this, "energyAxis", 100, "Max energy for the axis of plot"};
   // Phi in the histogram axis

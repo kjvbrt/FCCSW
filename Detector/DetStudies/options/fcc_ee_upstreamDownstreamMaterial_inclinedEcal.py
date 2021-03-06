@@ -119,7 +119,8 @@ hist.AuditExecute = True
 from Configurables import PodioOutput
 ### PODIO algorithm
 out = PodioOutput("out", OutputLevel=INFO)
-out.outputCommands = ["drop *"]
+# out.outputCommands = ["drop *"]
+out.outputCommands = ["drop *", "keep energyInLayer", "keep energyInCryo", "keep particleVec"]
 out.filename = "fccee_upstreamMaterial_inclinedEcal_%ideg_%iGeV_%s.root" % (theta, momentum, rndstr)
 
 # ApplicationMgr

@@ -8,7 +8,7 @@ momentum = 50
 theta = 90.
 thetaSpread = 10.
 
-samplingFractions = [0.24833, 0.09482, 0.12242, 0.14182, 0.15667, 0.16923, 0.17980, 0.20085]
+samplingFractions = [0.24833, 0.09482, 0.12242, 0.14182, 0.15667, 0.16923, 0.17980, 0.20085, 0.1, 0.1, 0.1, 0.1]
 # samplingFractions = [0.12125] + [0.14283] + [0.16354] + [0.17662] + [0.18867] + [0.19890] + [0.20637] + [0.20802]
 
 #---------------------------------------------------------------------------------------------------------------------
@@ -93,7 +93,7 @@ hist = UpstreamDownstreamMaterial("histsUpDownMaterial",
                                   energyAxis=momentum,
                                   phiAxis=0.1,
                                   readoutName="ECalBarrelEta",
-                                  numLayers=8,
+                                  numLayers=12,
                                   # sampling fraction is given as the upstream correction will be applied on calibrated
                                   # cells
                                   samplingFraction=samplingFractions,

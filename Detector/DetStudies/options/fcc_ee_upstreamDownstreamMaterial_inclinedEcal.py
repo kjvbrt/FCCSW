@@ -101,7 +101,7 @@ hist = UpstreamDownstreamMaterial("histsUpDownMaterial",
 hist.deposits.Path = "ECalBarrelCells"
 hist.particle.Path = "GenParticles"
 
-THistSvc().Output = ["det DATAFILE='histUpstream_fccee_hits_%ideg_%iGeV_%s.root' TYP='ROOT' OPT='RECREATE'" %
+THistSvc().Output = ["det DATAFILE='histUpstreamDownstream_fccee_hits_%ideg_%iGeV_%s.root' TYP='ROOT' OPT='RECREATE'" %
                      (theta, momentum, rndstr)]
 THistSvc().PrintAll=True
 THistSvc().AutoSave=True
@@ -119,9 +119,8 @@ hist.AuditExecute = True
 from Configurables import PodioOutput
 ### PODIO algorithm
 out = PodioOutput("out", OutputLevel=INFO)
-# out.outputCommands = ["drop *"]
 out.outputCommands = ["drop *", "keep energyInLayer", "keep energyInCryo", "keep particleVec"]
-out.filename = "fccee_upstreamMaterial_inclinedEcal_%ideg_%iGeV_%s.root" % (theta, momentum, rndstr)
+out.filename = "fccee_upstreamDownstreamMaterial_inclinedEcal_%ideg_%iGeV_%s.root" % (theta, momentum, rndstr)
 
 # ApplicationMgr
 from Configurables import ApplicationMgr

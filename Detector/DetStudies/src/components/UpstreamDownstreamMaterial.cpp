@@ -256,6 +256,7 @@ StatusCode UpstreamDownstreamMaterial::execute() {
   // Calibrate energy in the calorimeter layers
   for (size_t i = 0; i < m_numLayers; ++i) {
     sumEinLayer[i] /= m_samplingFraction[i];
+    energyInLayer->at(i) /= m_samplingFraction[i];
   }
 
   // Sum energy deposited in all calorimeter layers

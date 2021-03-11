@@ -32,10 +32,14 @@ def main():
     parser.add_argument('-u', '--upstream', action='store_true', default=False, help='upstream material')
     parser.add_argument('-d', '--downstream', action='store_true', default=False, help='downstream material')
     parser.add_argument('-l', '--layer-id', type=int, default=0, help='ID of the calorimeter layer')
-    parser.add_argument('-f', '--function', type=str, help='fit functions (in ROOT notation)')
-    parser.add_argument('-r', '--rebin-factor', type=int, help='Number of bins to be merged')
+    parser.add_argument('-f', '--function', type=str, help='fit function (in ROOT notation)')
+    parser.add_argument('--func-from', type=float, help='fit function starting value')
+    parser.add_argument('--func-to', type=float, help='fit function ending value')
+    parser.add_argument('-r', '--rebin-factor', type=int, help='number of bins to be merged')
+    parser.add_argument('-b', '--n-bins', type=int, help='number of bins of the histogram(s)')
     parser.add_argument('-n', '--note', action='append', default=[], type=str,
-                        help='note to be displayed in the plots')
+                        help='additional note to be displayed in the plots')
+    parser.add_argument('-o', '--output-file-format', type=str, default='pdf', help='output file format')
 
     required_arguments = parser.add_argument_group('required arguments')
     required_arguments.add_argument('-i', '--input-file', type=str, required=True, help='Input file path')
@@ -78,11 +82,13 @@ def main():
         exit(1)
 
     n_events = infile.events.GetEntries()
-    n_bins = math.ceil(math.sqrt(n_events))
+    if not args.n_bins:
+        args.n_bins = math.ceil(math.sqrt(n_events))
+    print('INFO: Number of bins: %i' % args.n_bins)
 
     hist_name = '%sEnergy__energyInLayer_%i' % (material_str, args.layer_id)
     hist_title = ';Energy in layer id: %i [GeV];%s Energy [GeV]' % (args.layer_id, material_str.capitalize())
-    hist = TH2D(hist_name, hist_title, int(n_bins), 0., 0., int(n_bins), 0., 0.)
+    hist = TH2D(hist_name, hist_title, int(args.n_bins), 0., 0., int(args.n_bins), 0., 0.)
     hist.Sumw2()
     hist.SetDirectory(0)
 
@@ -96,14 +102,14 @@ def main():
             cryo_energy = event.energyInCryo[1] + event.energyInCryo[4]
         if args.downstream:
             cryo_energy = event.energyInCryo[2] + event.energyInCryo[5]
-        hist.Fill(cryo_energy, event.energyInLayer[args.layer_id])
+        hist.Fill(event.energyInLayer[args.layer_id], cryo_energy)
     infile.Close()
     hist.BufferEmpty()
 
     particle_momentum /= n_events
     particle_theta /= n_events
-    print('Initial particle momentum: %.2f GeV' % (particle_momentum))
-    print('                 theta:    %.2f deg' % (particle_theta))
+    print('INFO: Initial particle momentum: %.2f GeV' % (particle_momentum))
+    print('                       theta:    %.2f deg' % (particle_theta))
 
     if args.rebin_factor:
         hist.Rebin(args.rebin_factor)
@@ -113,7 +119,7 @@ def main():
     plot_notes = []
     plot_notes.append('FCC-ee, LAr Calo')
     plot_notes.append('e^{-}, %i GeV, %i deg' % (round(particle_momentum), round(particle_theta)))
-    plot(hist, 'hist_' + plot_name, plot_notes)
+    plot(hist, 'hist_' + plot_name, plot_notes, args.output_file_format)
 
     profile = hist.ProfileX('profile_x')
     profile.GetYaxis().SetTitle('Mean ' + hist.GetYaxis().GetTitle())
@@ -122,13 +128,20 @@ def main():
         print('WARNING: Number of non empty bins too small, ignoring histogram!')
         exit(0)
 
-    func_from = hist.GetXaxis().GetBinLowEdge(hist.GetXaxis().GetFirst())
-    func_to = hist.GetXaxis().GetBinUpEdge(hist.GetXaxis().GetLast())
-    func = TF1('func', args.function, func_from, func_to)
+    if not args.func_from:
+        args.func_from = hist.GetXaxis().GetBinLowEdge(hist.GetXaxis().GetFirst())
+    if not args.func_to:
+        args.func_to = hist.GetXaxis().GetBinUpEdge(hist.GetXaxis().GetLast())
+    func = TF1('func', args.function, args.func_from, args.func_to)
+    for i in range(func.GetNpar()):
+        if args.upstream:
+            func.SetParName(i, '#upsilon_{%i}' % i)
+        if args.downstream:
+            func.SetParName(i, '#delta_{%i}' % i)
 
     result = profile.Fit(func, 'SR')
 
-    plot(profile, 'profile_' + plot_name, plot_notes)
+    plot(profile, 'profile_' + plot_name, plot_notes, args.output_file_format)
 
     results = []
     try:
@@ -148,7 +161,21 @@ def main():
         param_dict['error'] = result.Get().Error(i)
         param_dict['chi2'] = result.Get().Chi2()
         param_dict['ndf'] = result.Get().Ndf()
-        if param_dict not in results:
+        param_dict['index'] = i
+        param_dict['n_params'] = func.GetNpar()
+        if args.upstream:
+            param_dict['type'] = 'upstream'
+        if args.downstream:
+            param_dict['type'] = 'downstream'
+
+        if [r for r in results if r['name'] == param_dict['name'] and
+                r['momentum'] == param_dict['momentum'] and
+                r['theta'] == param_dict['theta']]:
+            results = [param_dict if r['name'] == param_dict['name'] and
+                       r['momentum'] == param_dict['momentum'] and
+                       r['theta'] == param_dict['theta']
+                       else r for r in results]
+        else:
             results.append(param_dict)
 
     with open('results_%s.json' % material_str, 'w') as results_file:
@@ -172,7 +199,7 @@ def get_theta(event):
     return theta
 
 
-def plot(obj, plotname, plot_notes=[]):
+def plot(obj, plotname, plot_notes=[], output_file_format='pdf'):
     from ROOT import gPad, gStyle
     from ROOT import TCanvas, TPaveText
     canvas = TCanvas('canvas_' + plotname, 'Canvas', 450, 450)
@@ -181,8 +208,6 @@ def plot(obj, plotname, plot_notes=[]):
 
     gStyle.SetOptStat(11)
     gStyle.SetOptFit(1111)
-
-    print(obj.ClassName())
 
     if 'TH2' in obj.ClassName():
         gPad.SetRightMargin(.13)
@@ -204,7 +229,7 @@ def plot(obj, plotname, plot_notes=[]):
 
     obj.Draw(draw_options)
     note.Draw()
-    canvas.Print(plotname + '.pdf')
+    canvas.Print(plotname + '.' + output_file_format)
 
 
 def count_bins_with_error(hist):

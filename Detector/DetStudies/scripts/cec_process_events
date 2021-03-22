@@ -7,30 +7,31 @@ import json
 
 def main():
     '''
-    Histogram and fit up(down)stream energy vs. first (last) calorimeter layer for FCC-ee LAr calorimeter.
+    Histogram and fit up(down)stream energy vs. energy in first (last) calorimeter layer.
+    Developed for FCC-ee LAr Calorimeter.
 
-    This script expects root file containing TTree "events" with three branches:
+    This script expects root file containing TTree "events" with following branches:
      * std::vector<double> energyInLayer -- energy deposited in calorimeter layers
-                                         -- layer_id 0 at position 0
-                                         -- etc.
-     * std::vector<double> energyInCryo -- energy deposited in the whole cryostat and also in its parts
-                                        -- energy deposited in whole cryostat at position 0
-                                        -- energy deposited in front cryostat at position 1
-                                        -- energy deposited in back cryostat at position 2
-                                        -- energy deposited in cryostat sides at position 3
-                                        -- energy deposited in front LAr bath at position 4
-                                        -- energy deposited in back LAr bath at position 5
-     * std::vector<double> particleVec  -- momentum of initial particle
-                                        -- px at position 0
-                                        -- py at position 1
-                                        -- pz at position 2
+          -- layer_id 0 at position 0
+          -- etc.
+     * std::vector<double> energyInCryo -- energy deposited in the whole cryostat and in its parts
+          -- energy deposited in whole cryostat at position 0
+          -- energy deposited in front cryostat at position 1
+          -- energy deposited in back cryostat at position 2
+          -- energy deposited in cryostat sides at position 3
+          -- energy deposited in front LAr bath at position 4
+          -- energy deposited in back LAr bath at position 5
+     * std::vector<double> particleVec -- momentum of initial particle
+          -- px at position 0
+          -- py at position 1
+          -- pz at position 2
 
-    Output of this script is input for the calo_energy_corr script
+    Output of this script serves as input for the calo_energy_corr script.
+    To run over multiple energies/angles of initial particle use for loop, e.g.:
+      for i in *root; do ./cec_process_events -i $i -u; done
     '''
     parser = argparse.ArgumentParser(description='Yay, histogram and fit up(down)stream energy vs. energy in layer!')
 
-    parser.add_argument('-u', '--upstream', action='store_true', default=False, help='upstream material')
-    parser.add_argument('-d', '--downstream', action='store_true', default=False, help='downstream material')
     parser.add_argument('-l', '--layer-id', type=int, default=0, help='ID of the calorimeter layer')
     parser.add_argument('-f', '--function', type=str, help='fit function (in ROOT notation)')
     parser.add_argument('--func-from', type=float, help='fit function starting value')
@@ -39,16 +40,18 @@ def main():
     parser.add_argument('-b', '--n-bins', type=int, help='number of bins of the histogram(s)')
     parser.add_argument('-n', '--note', action='append', default=[], type=str,
                         help='additional note to be displayed in the plots')
-    parser.add_argument('-o', '--output-file-format', type=str, default='pdf', help='output file format')
+    parser.add_argument('-o', '--output', type=str, default='fir_results.json', help='output JSON file name')
+    parser.add_argument('--output-file-format', type=str, default='pdf', help='plot output file format')
 
     required_arguments = parser.add_argument_group('required arguments')
     required_arguments.add_argument('-i', '--input-file', type=str, required=True, help='Input file path')
 
-    args = parser.parse_args()
+    xor_arguments = parser.add_mutually_exclusive_group(required=True)
+    xor_arguments.add_argument('-u', '--upstream', action='store_true', help='upstream material')
+    xor_arguments.add_argument('-d', '--downstream', action='store_true', help='downstream material')
+    xor_arguments.title = 'exclusive arguments'
 
-    if args.upstream == args.downstream:
-        print('ERROR: Select "upstream" or "downstream"!')
-        exit(1)
+    args = parser.parse_args()
 
     if not args.layer_id:
         if args.upstream:
@@ -106,19 +109,18 @@ def main():
     infile.Close()
     hist.BufferEmpty()
 
-    particle_momentum /= n_events
-    particle_theta /= n_events
-    print('INFO: Initial particle momentum: %.2f GeV' % (particle_momentum))
-    print('                       theta:    %.2f deg' % (particle_theta))
+    particle_momentum = int(round(particle_momentum / n_events))
+    particle_theta = int(round(particle_theta / n_events))
+    print('INFO: Initial particle momentum: %i GeV' % (particle_momentum))
+    print('                       theta:    %i deg' % (particle_theta))
 
     if args.rebin_factor:
         hist.Rebin(args.rebin_factor)
 
-    plot_name = '%s_vs_layer_%i_%ideg_%iGeV' % (material_str, args.layer_id,
-                                                round(particle_theta), round(particle_momentum))
+    plot_name = '%s_vs_layer_%i_%ideg_%iGeV' % (material_str, args.layer_id, particle_theta, particle_momentum)
     plot_notes = []
     plot_notes.append('FCC-ee, LAr Calo')
-    plot_notes.append('e^{-}, %i GeV, %i deg' % (round(particle_momentum), round(particle_theta)))
+    plot_notes.append('e^{-}, %i GeV, %i deg' % (particle_momentum, particle_theta))
     plot(hist, 'hist_' + plot_name, plot_notes, args.output_file_format)
 
     profile = hist.ProfileX('profile_x')
@@ -145,7 +147,7 @@ def main():
 
     results = []
     try:
-        with open('results_%s.json' % material_str) as results_file:
+        with open(args.output) as results_file:
             data = json.load(results_file)
             if data.get('results'):
                 results = data['results']
@@ -163,22 +165,19 @@ def main():
         param_dict['ndf'] = result.Get().Ndf()
         param_dict['index'] = i
         param_dict['n_params'] = func.GetNpar()
+        param_dict['func'] = func.GetFormula().GetExpFormula().Data()
         if args.upstream:
             param_dict['type'] = 'upstream'
         if args.downstream:
             param_dict['type'] = 'downstream'
 
-        if [r for r in results if r['name'] == param_dict['name'] and
-                r['momentum'] == param_dict['momentum'] and
-                r['theta'] == param_dict['theta']]:
-            results = [param_dict if r['name'] == param_dict['name'] and
-                       r['momentum'] == param_dict['momentum'] and
-                       r['theta'] == param_dict['theta']
-                       else r for r in results]
-        else:
-            results.append(param_dict)
+        results = [r for r in results if not (r['name'] == param_dict['name'] and
+                                              r['type'] == param_dict['type'] and
+                                              r['momentum'] == param_dict['momentum'] and
+                                              r['theta'] == param_dict['theta'])]
+        results.append(param_dict)
 
-    with open('results_%s.json' % material_str, 'w') as results_file:
+    with open(args.output, 'w') as results_file:
         json.dump({'results': results}, results_file, indent=4)
 
 
@@ -226,6 +225,16 @@ def plot(obj, plotname, plot_notes=[], output_file_format='pdf'):
     note.SetTextAlign(11)
     for note_text in plot_notes:
         note.AddText(note_text)
+
+    func = obj.GetListOfFunctions().Last()
+    if func:
+        formula = func.GetFormula().GetExpFormula().Data()
+        formula = formula.replace(']', '')
+        formula = formula.replace('[', '')
+        formula = formula.replace(')', '')
+        formula = formula.replace('(', '')
+        note.AddText('Fit func.:   %s' % (formula))
+        note.GetListOfLines().Last().SetTextColor(func.GetLineColor())
 
     obj.Draw(draw_options)
     note.Draw()

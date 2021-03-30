@@ -45,9 +45,39 @@ THistSvc().Output = ["rec DATAFILE='histSF_inclined_e50GeV_eta0_1events.root' TY
 
 Example of the [analysis script](https://github.com/zaborowska/FCC_calo_analysis_cpp/blob/withJanasChanges/scripts/plot_samplingFraction.py).
 
-### How to correct for dead material
 
-Calorimeters may be surrounded by dead material (cryostat, services), in which particles may deposit energy. In order to investigate the dependence of the energy depoisted in the dead material on the energy deposited in the detector (in each layer), algorithm `UpstreamMaterial` can be used. It additionally creates a debug histogram of azimuthal angle dependence of the deposited energy in the detector. The algorithm requires a dedicated simulation, run with saving deposits within the dead material. The distinction between the dead and active material is made looking into bitfield 'cryo'. 'cryo'==0 for active, ==1 for dead material.
+### Dead material
+
+Calorimeters are usually surrounded by so called dead material, i. e. enclosure, supporting structure and services. In
+this non-active material particles which are to be measured in the calorimeter deposit part of their energy. The
+correction for this energy loss is called upstream correction and it exploits simple dependence between energy deposited
+in the dead material and energy deposited in the first layer of the calorimeter. Concrete form of the correction can be
+derived by employing algorithm `EnergyInCaloLayers` which saves energy deposited in every calorimeter layer separately
+together with energies deposited in calorimeter's cryostat into the output TTree. Example usage can be found in
+`DetStudies/options/upDownstreamMaterial_inclinedEcal.py`. Here is small snippet:
+```python
+from Configurables import EnergyInCaloLayers
+caloLayers = EnergyInCaloLayers(readoutName = "ECalBarrelEta",
+                                numLayers = 8,
+                                samplingFraction = [0.12125, 0.14283, 0.16354, 0.17662, 0.18867, 0.19890, 0.20637,
+                                                    0.20802],
+                                OutputLevel=VERBOSE)
+caloLayers.deposits.Path = "ECalBarrelCells"
+caloLayers.particle.Path="GenParticles"
+```
+
+The output of this algorithm is used as input for the `cec_process_events` script located in `DetStudies/scripts/`.
+
+
+
+
+In case of FCC-ee LAr calorimeter 
+calculated as
+follows
+
+
+
+may be surrounded by dead material (cryostat, services), in which particles may deposit energy. In order to investigate the dependence of the energy depoisted in the dead material on the energy deposited in the detector (in each layer), algorithm `UpstreamMaterial` can be used. It additionally creates a debug histogram of azimuthal angle dependence of the deposited energy in the detector. The algorithm requires a dedicated simulation, run with saving deposits within the dead material. The distinction between the dead and active material is made looking into bitfield 'cryo'. 'cryo'==0 for active, ==1 for dead material.
 
 Example [DetStudies/tests/options/upstreamMaterial_inclinedEcal.py](../DetStudies/tests/options/upstreamMaterial_inclinedEcal.py):
 
@@ -76,3 +106,7 @@ THistSvc().Output = ["det DATAFILE='histUpstream_hits_e50GeV_eta0_Bfield1_10even
 - *samplingFraction* is used for calibration of the deposits, useful is correction for the upstream material is used after the cell calibration (default case)
 
 Example of the [analysis script](https://github.com/zaborowska/FCC_calo_analysis_cpp/blob/withJanasChanges/scripts/plot_upstreamCorrecton.py).
+
+
+### Shower leakage
+

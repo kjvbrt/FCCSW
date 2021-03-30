@@ -88,25 +88,16 @@ createcellsBarrel = CreateCaloCells("CreateCaloCellsBarrel",
 createcellsBarrel.hits.Path="ECalBarrelHits"
 createcellsBarrel.cells.Path="ECalBarrelCells"
 
-from Configurables import UpstreamDownstreamMaterial
-hist = UpstreamDownstreamMaterial("histsUpDownMaterial",
-                                  energyAxis=momentum,
-                                  phiAxis=0.1,
-                                  readoutName="ECalBarrelEta",
-                                  numLayers=8,
-                                  # sampling fraction is given as the upstream correction will be applied on calibrated
-                                  # cells
-                                  samplingFraction=samplingFractions,
-                                  OutputLevel=VERBOSE)
-hist.deposits.Path = "ECalBarrelCells"
-hist.particle.Path = "GenParticles"
-
-THistSvc().Output = ["det DATAFILE='histUpstreamDownstream_fccee_hits_%ideg_%iGeV_%s.root' TYP='ROOT' OPT='RECREATE'" %
-                     (theta, momentum, rndstr)]
-THistSvc().PrintAll=True
-THistSvc().AutoSave=True
-THistSvc().AutoFlush=True
-THistSvc().OutputLevel=INFO
+from Configurables import EnergyInCaloLayers
+caloLayers = EnergyInCaloLayers("caloLayers",
+                                readoutName="ECalBarrelEta",
+                                numLayers=8,
+                                # sampling fraction is given as the upstream correction will be applied on calibrated
+                                # cells
+                                samplingFraction=samplingFractions,
+                                OutputLevel=VERBOSE)
+caloLayers.deposits.Path = "ECalBarrelCells"
+caloLayers.particle.Path = "GenParticles"
 
 # Print CPU information
 from Configurables import AuditorSvc, ChronoAuditor
@@ -114,7 +105,7 @@ chra = ChronoAuditor()
 audsvc = AuditorSvc()
 audsvc.Auditors = [chra]
 geantsim.AuditExecute = True
-hist.AuditExecute = True
+caloLayers.AuditExecute = True
 
 from Configurables import PodioOutput
 ### PODIO algorithm
@@ -124,7 +115,7 @@ out.filename = "fccee_upstreamDownstreamMaterial_inclinedEcal_%ideg_%iGeV_%s.roo
 
 # ApplicationMgr
 from Configurables import ApplicationMgr
-ApplicationMgr(TopAlg=[genalg_pgun, hepmc_converter, geantsim, createcellsBarrel, hist, out],
+ApplicationMgr(TopAlg=[genalg_pgun, hepmc_converter, geantsim, createcellsBarrel, caloLayers, out],
                EvtSel='NONE',
                EvtMax=10,
                # order is important, as GeoSvc is needed by G4SimSvc

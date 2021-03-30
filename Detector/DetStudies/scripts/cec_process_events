@@ -26,9 +26,12 @@ def main():
           -- py at position 1
           -- pz at position 2
 
-    Output of this script serves as input for the calo_energy_corr script.
+    Output of this script serves as input for the `cec_derive` script.
     To run over multiple energies/angles of initial particle use for loop, e.g.:
+
       for i in *root; do ./cec_process_events -i $i -u; done
+
+    The fit results are stored in json file named `fit_results.json`.
     '''
     parser = argparse.ArgumentParser(description='Yay, histogram and fit up(down)stream energy vs. energy in layer!')
 
@@ -40,7 +43,7 @@ def main():
     parser.add_argument('-b', '--n-bins', type=int, help='number of bins of the histogram(s)')
     parser.add_argument('-n', '--note', action='append', default=[], type=str,
                         help='additional note to be displayed in the plots')
-    parser.add_argument('-o', '--output', type=str, default='fir_results.json', help='output JSON file name')
+    parser.add_argument('-o', '--output', type=str, default='fit_results.json', help='output JSON file name')
     parser.add_argument('--output-file-format', type=str, default='pdf', help='plot output file format')
 
     required_arguments = parser.add_argument_group('required arguments')
@@ -63,6 +66,11 @@ def main():
     if not args.function:
         args.function = 'pol1'
         print('WARNING: Using default fitting function "pol1".')
+
+    if not args.note:
+        args.note.append('FCC-ee, LAr Calo')
+        args.note.append('electron')
+        print('WARNING: Using default plot legend notes.')
 
     if args.upstream:
         material_str = 'upstream'
@@ -87,7 +95,7 @@ def main():
     n_events = infile.events.GetEntries()
     if not args.n_bins:
         args.n_bins = math.ceil(math.sqrt(n_events))
-    print('INFO: Number of bins: %i' % args.n_bins)
+    print('INFO: Number of histogram bins: %i' % args.n_bins)
 
     hist_name = '%sEnergy__energyInLayer_%i' % (material_str, args.layer_id)
     hist_title = ';Energy in layer id: %i [GeV];%s Energy [GeV]' % (args.layer_id, material_str.capitalize())
@@ -106,6 +114,7 @@ def main():
         if args.downstream:
             cryo_energy = event.energyInCryo[2] + event.energyInCryo[5]
         hist.Fill(event.energyInLayer[args.layer_id], cryo_energy)
+
     infile.Close()
     hist.BufferEmpty()
 
@@ -114,14 +123,13 @@ def main():
     print('INFO: Initial particle momentum: %i GeV' % (particle_momentum))
     print('                       theta:    %i deg' % (particle_theta))
 
+    args.note.append('%i GeV, %i deg' % (particle_momentum, particle_theta))
+
     if args.rebin_factor:
         hist.Rebin(args.rebin_factor)
 
-    plot_name = '%s_vs_layer_%i_%ideg_%iGeV' % (material_str, args.layer_id, particle_theta, particle_momentum)
-    plot_notes = []
-    plot_notes.append('FCC-ee, LAr Calo')
-    plot_notes.append('e^{-}, %i GeV, %i deg' % (particle_momentum, particle_theta))
-    plot(hist, 'hist_' + plot_name, plot_notes, args.output_file_format)
+    plot_name = '%s_vs_layer_%i_%ideg_%igev' % (material_str, args.layer_id, particle_theta, particle_momentum)
+    plot(hist, 'hist_' + plot_name, args)
 
     profile = hist.ProfileX('profile_x')
     profile.GetYaxis().SetTitle('Mean ' + hist.GetYaxis().GetTitle())
@@ -143,7 +151,7 @@ def main():
 
     result = profile.Fit(func, 'SR')
 
-    plot(profile, 'profile_' + plot_name, plot_notes, args.output_file_format)
+    plot(profile, 'profile_' + plot_name, args)
 
     results = []
     try:
@@ -190,15 +198,31 @@ def get_momentum(event):
 
 
 def get_theta(event):
-    theta = math.atan(event.particleVec[1] / event.particleVec[2])
-    if theta < 0:
-        theta = math.pi + theta
+    # theta = math.atan(event.particleVec[2] / event.particleVec[3])
+    theta = math.atan2(event.particleVec[1], event.particleVec[2])
+    # if theta < 0:
+    #     theta = math.pi + theta
     theta = 180 * theta / math.pi
 
     return theta
 
 
-def plot(obj, plotname, plot_notes=[], output_file_format='pdf'):
+def get_energy(event):
+    energy = 0.
+    for layer_energy in event.energyInLayer:
+        energy += layer_energy
+
+    return energy
+
+
+def get_phi(event):
+    # phi = math.atan(event.particleVec[2] / event.particleVec[1])
+    phi = math.atan2(event.particleVec[1], event.particleVec[0])
+
+    return phi
+
+
+def plot(obj, plotname, args):
     from ROOT import gPad, gStyle
     from ROOT import TCanvas, TPaveText
     canvas = TCanvas('canvas_' + plotname, 'Canvas', 450, 450)
@@ -207,6 +231,9 @@ def plot(obj, plotname, plot_notes=[], output_file_format='pdf'):
 
     gStyle.SetOptStat(11)
     gStyle.SetOptFit(1111)
+    draw_options = ''
+
+    obj.SetTitle('')
 
     if 'TH2' in obj.ClassName():
         gPad.SetRightMargin(.13)
@@ -214,17 +241,17 @@ def plot(obj, plotname, plot_notes=[], output_file_format='pdf'):
 
     if 'TProfile' in obj.ClassName():
         gPad.SetRightMargin(.05)
-        draw_options = ''
+        obj.SetLineWidth(2)
 
-    note = TPaveText(.2, .7, .5, .9, 'brNDC')
-    note.SetFillStyle(0)
-    note.SetFillColor(0)
-    note.SetBorderSize(0)
-    note.SetTextColor(1)
-    note.SetTextFont(42)
-    note.SetTextAlign(11)
-    for note_text in plot_notes:
-        note.AddText(note_text)
+    legend = TPaveText(.2, .7, .5, .9, 'brNDC')
+    legend.SetFillStyle(0)
+    legend.SetFillColor(0)
+    legend.SetBorderSize(0)
+    legend.SetTextColor(1)
+    legend.SetTextFont(42)
+    legend.SetTextAlign(11)
+    for note in args.note:
+        legend.AddText(note)
 
     func = obj.GetListOfFunctions().Last()
     if func:
@@ -233,12 +260,12 @@ def plot(obj, plotname, plot_notes=[], output_file_format='pdf'):
         formula = formula.replace('[', '')
         formula = formula.replace(')', '')
         formula = formula.replace('(', '')
-        note.AddText('Fit func.:   %s' % (formula))
-        note.GetListOfLines().Last().SetTextColor(func.GetLineColor())
+        legend.AddText('Fit func.:   %s' % (formula))
+        legend.GetListOfLines().Last().SetTextColor(func.GetLineColor())
 
     obj.Draw(draw_options)
-    note.Draw()
-    canvas.Print(plotname + '.' + output_file_format)
+    legend.Draw()
+    canvas.Print(plotname + '.' + args.output_file_format)
 
 
 def count_bins_with_error(hist):

@@ -7,7 +7,7 @@ import json
 
 def main():
     '''
-    Process events for validation of up(down)stream energy calorimeter correction.
+    Test up(down)stream energy calorimeter correction.
 
     This script expects root file containing TTree "events" with three branches:
      * std::vector<double> energyInLayer -- energy deposited in calorimeter layers
@@ -26,9 +26,9 @@ def main():
                                         -- pz at position 2
     and json file with parameters of the calorimeter energy corrections.
 
-    Output of this script is input for the cec_validate_summary script.
+    Output of this script is input for the cec_test_summary script.
     '''
-    parser = argparse.ArgumentParser(description='Yay, validate up(down)stream energy corrections!')
+    parser = argparse.ArgumentParser(description='Yay, test up(down)stream energy corrections!')
 
     parser.add_argument('-n', '--note', action='append', default=[], type=str,
                         help='additional note to be displayed in the plots')

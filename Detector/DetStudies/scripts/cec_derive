@@ -5,11 +5,11 @@ import json
 
 def main():
     '''
-    Calculate up(down)stream energy correction for FCC-ee LAr calorimeter.
+    Derive up(down)stream energy correction for FCC-ee LAr calorimeter.
 
-    This script expects json file from "process_events" script.
+    This script expects json file with fit results from "cec_process_events" script.
     '''
-    parser = argparse.ArgumentParser(description='Yay, calculate up(down)stream correction parameters!')
+    parser = argparse.ArgumentParser(description='Yay, derive up(down)stream correction parameters!')
 
     parser.add_argument('-f', '--functions', type=str, default=[], action='append',
                         help='fit functions (in ROOT notation)')

@@ -83,7 +83,9 @@ StatusCode EnergyInCaloLayers::execute() {
   particleVec->at(1) = particles->at(0).core().p4.px;
   particleVec->at(2) = particles->at(0).core().p4.py;
   particleVec->at(3) = particles->at(0).core().p4.pz;
-  double particleTheta = std::atan2(particles->at(0).core().p4.py, particles->at(0).core().p4.pz);
+  double rxy = std::sqrt(std::pow(particles->at(0).core().p4.px, 2) + std::pow(particles->at(0).core().p4.py, 2));
+  double particleTheta = fabs(std::atan2(rxy, particles->at(0).core().p4.pz));
+  particleTheta = 180. * particleTheta / M_PI;
 
   // Get the energy deposited in the calorimeter layers and in the cryostat and its parts
   const auto deposits = m_deposits.get();
@@ -113,7 +115,7 @@ StatusCode EnergyInCaloLayers::execute() {
 
   // Printouts
   verbose() << "********************************************************************" << endmsg;
-  verbose() << "Particle theta: " << particleTheta << endmsg << endmsg;
+  verbose() << "Particle theta: " << particleTheta << " deg" << endmsg << endmsg;
 
   verbose() << "Energy in layers:" << endmsg;
   for (size_t i = 0; i < energyInLayer->size(); ++i) {

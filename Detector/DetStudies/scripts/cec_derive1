@@ -5,7 +5,7 @@ import json
 
 def main():
     '''
-    Derive up(down)stream energy correction for FCC-ee LAr calorimeter.
+    Derive up(down)stream calorimeter energy correction dependent on cluster energy or theta.
 
     This script expects json file with fit results from "cec_process_events" script.
     '''
@@ -13,9 +13,16 @@ def main():
 
     parser.add_argument('-f', '--functions', type=str, default=[], action='append',
                         help='fit functions (in ROOT notation)')
+    parser.add_argument('--energy-slice', type=float, default=50., help='derive correction at constant theta')
+    parser.add_argument('--theta-slice', type=float, default=90., help='derive correction at constant energy')
 
     required_arguments = parser.add_argument_group('required arguments')
     required_arguments.add_argument('-i', '--input-file', type=str, required=True, help='Input file path')
+    required_arguments.add_argument('-d', '--dependence', '--corr-dependence', type=str, required=True,
+                                    choices=['energy', 'theta'],
+                                    help='select variable on which the correction is dependent')
+    required_arguments.add_argument('-t', '--type', '--corr-type', type=str, required=True,
+                                    choices=['upstream', 'downstream'], help='select correction type')
 
     args = parser.parse_args()
 
@@ -38,45 +45,36 @@ def main():
 
     graphs = {}
     for result in results:
+        if result['type'] != args.corr_type:
+            continue
+        if args.corr_dependence == 'energy' and args.theta_slice != result['theta']:
+            continue
+        if args.corr_dependence == 'theta' and args.energy_slice != result['energy']:
+            continue
         if not graphs.get(result['name']):
             graph = {}
             graph['x'] = []
             graph['y'] = []
             graph['y_err'] = []
-            graph['x_label'] = 'E_{cluster} [GeV]'
+            if args.corr_dependence == 'energy':
+                graph['x_label'] = 'E_{cluster} [GeV]'
+            if args.corr_dependence == 'theta':
+                graph['x_label'] = '#theta [deg]'
             graph['y_label'] = result['name']
             graph['index'] = result['index']
-            graph['type'] = result['type']
             graphs[result['name']] = graph
-        graphs[result['name']]['x'].append(result['momentum'])
+        graphs[result['name']]['x'].append(result[args.corr_dependence])
         graphs[result['name']]['y'].append(result['value'])
         graphs[result['name']]['y_err'].append(result['error'])
 
-    for result in results:
-        if result['index'] != 0:
-            continue
-        if not graphs.get('chi2'):
-            graph = {}
-            graph['x'] = []
-            graph['y'] = []
-            graph['y_err'] = []
-            graph['x_label'] = 'E_{cluster} [GeV]'
-            graph['y_label'] = '#Chi^{2}'
-            graph['index'] = -1
-            graph['type'] = result['type']
-            graphs['chi2'] = graph
-        graphs['chi2']['x'].append(result['momentum'])
-        graphs['chi2']['y'].append(result['chi2']/result['ndf'])
-        graphs['chi2']['y_err'].append(0)
-
-    from ROOT import TGraphErrors, TF1
+    from ROOT import TGraphErrors, TGraph, TF1
 
     graphs = sorted(graphs.items(), key=lambda graph: graph[1]['index'])
 
     param_counter = 97
     for graph_name, graph_dict in graphs:
         graph = TGraphErrors()
-        graph.SetName('graph_' + graph_dict['type'] + '_' +
+        graph.SetName('graph_' + args.corr_type + '_' + args.corr_depenece + '_' +
                       graph_name.replace('#', '').replace('{', '').replace('}', ''))
         for i in range(len(graph_dict['x'])):
             graph.SetPoint(i, graph_dict['x'][i], graph_dict['y'][i])
@@ -89,15 +87,15 @@ def main():
             print('WARNING: Number of points in parameter graph is too small!')
             exit(0)
 
-        if graph_name != 'chi2':
+        try:
             overhang = 0.1 * abs(max(graph_dict['x']) - min(graph_dict['x']))
-            try:
-                func = TF1("func", args.functions[graph_dict['index']],
-                           min(graph_dict['x']) - overhang,
-                           max(graph_dict['x']) + overhang)
-            except IndexError:
-                print('ERROR: Fitting function for parameter "' + graph_name + '" not provided!')
-                exit(1)
+            func = TF1("func", args.functions[graph_dict['index']],
+                       min(graph_dict['x']) - overhang,
+                       max(graph_dict['x']) + overhang)
+        except IndexError:
+            print('WARNING: Fitting function for parameter "' + graph_name + '" not provided.')
+            print('         Skipping fit!')
+        else:
             for i in range(func.GetNpar()):
                 func.SetParName(i, chr(param_counter))
                 param_counter += 1
@@ -120,21 +118,53 @@ def main():
                 param_dict['error'] = result.Get().Error(i)
                 param_dict['func'] = args.functions[graph_dict['index']]
                 param_dict['mother_param'] = graph_name
-                param_dict['type'] = graph_dict['type']
+                param_dict['type'] = args.corr_type
+                param_dict['dependence'] = args.corr_depenece
                 param_dict['index'] = i
+                if args.corr_depenece == 'energy':
+                    param_dict['theta_slice'] == args.theta_slice
+                if args.corr_depenece == 'theta':
+                    param_dict['energy_slice'] == args.energy_slice
 
-                if [p for p in corr_params if p['name'] == param_dict['name'] and
-                        p['type'] == param_dict['type']]:
-                    corr_params = [param_dict if p['name'] == param_dict['name'] and
-                                   p['type'] == param_dict['type']
-                                   else p for p in corr_params]
-                else:
-                    corr_params.append(param_dict)
+                corr_params = [p for p in corr_params if not (p['name'] == param_dict['name'] and
+                                                              p['type'] == param_dict['type'] and
+                                                              p['dependence'] == param_dict['dependence'])]
+                corr_params.append(param_dict)
 
             with open('corr_params.json', 'w') as outfile:
                 json.dump({'corr_params': corr_params}, outfile, indent=4)
 
         plot(graph, graph.GetName())
+
+    dict_chi2 = {}
+    dict_chi2['x'] = []
+    dict_chi2['y'] = []
+    for result in results:
+        if result['type'] != args.corr_type:
+            continue
+        if args.energy and result['theta'] != args.const_theta:
+            continue
+        if args.theta and result['momentum'] != args.const_energy:
+            continue
+        if result['index'] != 0:
+            continue
+        dict_chi2['x'].append(result[args.corr_depenece])
+        dict_chi2['y'].append(result['chi2']/result['ndf'])
+
+    if not dict_chi2['x']:
+        return
+
+    graph_chi2 = TGraph()
+    graph_chi2.SetName('graph_' + args.corr_type + '_' + args.corr_depenece + '_chi2')
+    for i in range(len(dict_chi2['x'])):
+        graph_chi2.SetPoint(i, dict_chi2['x'][i], dict_chi2['y'][i])
+
+    if args.energy:
+        graph_chi2.GetXaxis().SetTitle('E_{cluster} [GeV]')
+    if args.theta:
+        graph_chi2.GetXaxis().SetTitle('#theta [deg]')
+    graph_chi2.GetYaxis().SetTitle('#chi^{2} / NDF')
+    plot(graph_chi2, graph_chi2.GetName())
 
 
 def plot(obj, plotname, plot_notes=[]):
@@ -155,7 +185,8 @@ def plot(obj, plotname, plot_notes=[]):
     obj.SetMarkerStyle(20)
     obj.SetMarkerSize(.5)
 
-    obj.SetMaximum(1.4 * max(obj.GetY()))
+    if obj.ClassName() == 'TGraphErrors':
+        obj.SetMaximum(1.4 * max(obj.GetY()))
 
     note = TPaveText(.2, .7, .5, .9, 'brNDC')
     note.SetFillStyle(0)
@@ -167,7 +198,7 @@ def plot(obj, plotname, plot_notes=[]):
     for note_text in plot_notes:
         note.AddText(note_text)
 
-    obj.Draw('APE')
+    obj.Draw('APEL')
     note.Draw()
     canvas.Print(plotname + '.pdf')
 

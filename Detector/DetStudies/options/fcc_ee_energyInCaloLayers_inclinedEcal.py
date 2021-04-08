@@ -1,6 +1,5 @@
-from Gaudi.Configuration import *
-
-from GaudiKernel.SystemOfUnits import MeV, GeV
+from Gaudi.Configuration import INFO, VERBOSE
+from GaudiKernel.SystemOfUnits import GeV
 
 # Electron momentum in GeV
 momentum = 50
@@ -9,9 +8,8 @@ theta = 90.
 thetaSpread = 10.
 
 samplingFractions = [0.24833, 0.09482, 0.12242, 0.14182, 0.15667, 0.16923, 0.17980, 0.20085]
-# samplingFractions = [0.12125] + [0.14283] + [0.16354] + [0.17662] + [0.18867] + [0.19890] + [0.20637] + [0.20802]
 
-#---------------------------------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------------------------------
 
 # Random string for output files
 import uuid
@@ -21,19 +19,17 @@ rndstr = uuid.uuid4().hex[0:16]
 from Configurables import FCCDataSvc
 podioevent = FCCDataSvc("EventDataSvc")
 
-# Particle gun setup
-_pi = 3.14159
-
-from Configurables import  MomentumRangeParticleGun
+from Configurables import MomentumRangeParticleGun
+from math import pi
 pgun = MomentumRangeParticleGun("ParticleGun_Electron")
 pgun.PdgCodes = [11]
 pgun.MomentumMin = momentum * GeV
 pgun.MomentumMax = momentum * GeV
 pgun.PhiMin = 0
-pgun.PhiMax = 2 * _pi
+pgun.PhiMax = 2 * pi
 # theta = 90 degrees (eta = 0)
-pgun.ThetaMin = (theta - thetaSpread/2) * _pi / 180.
-pgun.ThetaMax = (theta + thetaSpread/2) * _pi / 180.
+pgun.ThetaMin = (theta - thetaSpread/2) * pi / 180.
+pgun.ThetaMax = (theta + thetaSpread/2) * pi / 180.
 
 from Configurables import GenAlg
 genalg_pgun = GenAlg()
@@ -42,16 +38,16 @@ genalg_pgun.hepmc.Path = "hepmc"
 
 from Configurables import HepMCToEDMConverter
 hepmc_converter = HepMCToEDMConverter()
-hepmc_converter.hepmc.Path="hepmc"
-hepmc_converter.genparticles.Path="GenParticles"
-hepmc_converter.genvertices.Path="GenVertices"
+hepmc_converter.hepmc.Path = "hepmc"
+hepmc_converter.genparticles.Path = "GenParticles"
+hepmc_converter.genvertices.Path = "GenVertices"
 
 # DD4hep geometry service
 from Configurables import GeoSvc
 geoservice = GeoSvc("GeoSvc",
                     detectors=['file:Detector/DetFCCeeIDEA-LAr/compact/FCCee_DectEmptyMaster.xml',
                                'file:Detector/DetFCCeeECalInclined/compact/FCCee_ECalBarrel_upstream.xml'],
-                    OutputLevel = INFO)
+                    OutputLevel=INFO)
 
 # Geant4 service
 # Configures the Geant simulation: geometry, physics list and user actions
@@ -67,7 +63,7 @@ geantservice.g4PostInitCommands += ["/run/setCut 0.1 mm"]
 # and a tool that saves the calorimeter hits
 from Configurables import SimG4Alg, SimG4SaveCalHits
 saveecaltool = SimG4SaveCalHits("saveECalBarrelHits",
-                                readoutNames = ["ECalBarrelEta"])
+                                readoutNames=["ECalBarrelEta"])
 saveecaltool.positionedCaloHits.Path = "ECalBarrelPositionedHits"
 saveecaltool.caloHits.Path = "ECalBarrelHits"
 
@@ -77,16 +73,17 @@ particle_converter.genParticles.Path = "GenParticles"
 
 # next, create the G4 algorithm, giving the list of names of tools ("XX/YY")
 geantsim = SimG4Alg("SimG4Alg",
-                    outputs= ["SimG4SaveCalHits/saveECalBarrelHits"],
-                    eventProvider = particle_converter,
-                    OutputLevel = INFO)
+                    outputs=["SimG4SaveCalHits/saveECalBarrelHits"],
+                    eventProvider=particle_converter,
+                    OutputLevel=INFO)
 
 from Configurables import CreateCaloCells
 createcellsBarrel = CreateCaloCells("CreateCaloCellsBarrel",
                                     doCellCalibration=False,
-                                    addCellNoise=False, filterCellNoise=False)
-createcellsBarrel.hits.Path="ECalBarrelHits"
-createcellsBarrel.cells.Path="ECalBarrelCells"
+                                    addCellNoise=False,
+                                    filterCellNoise=False)
+createcellsBarrel.hits.Path = "ECalBarrelHits"
+createcellsBarrel.cells.Path = "ECalBarrelCells"
 
 from Configurables import EnergyInCaloLayers
 caloLayers = EnergyInCaloLayers("caloLayers",
@@ -107,11 +104,11 @@ audsvc.Auditors = [chra]
 geantsim.AuditExecute = True
 caloLayers.AuditExecute = True
 
-from Configurables import PodioOutput
 ### PODIO algorithm
+from Configurables import PodioOutput
 out = PodioOutput("out", OutputLevel=INFO)
 out.outputCommands = ["drop *", "keep energyInLayer", "keep energyInCryo", "keep particleVec"]
-out.filename = "fccee_upstreamDownstreamMaterial_inclinedEcal_%ideg_%iGeV_%s.root" % (theta, momentum, rndstr)
+out.filename = "fccee_energyInCaloLayers_inclinedEcal_%ideg_%igev_%s.root" % (theta, momentum, rndstr)
 
 # ApplicationMgr
 from Configurables import ApplicationMgr
@@ -120,5 +117,4 @@ ApplicationMgr(TopAlg=[genalg_pgun, hepmc_converter, geantsim, createcellsBarrel
                EvtMax=10,
                # order is important, as GeoSvc is needed by G4SimSvc
                ExtSvc=[podioevent, geoservice, geantservice, audsvc],
-               OutputLevel=INFO
-)
+               OutputLevel=INFO)

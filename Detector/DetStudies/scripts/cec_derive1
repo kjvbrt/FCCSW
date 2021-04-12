@@ -13,21 +13,41 @@ def main():
 
     parser.add_argument('-f', '--functions', type=str, default=[], action='append',
                         help='fit functions (in ROOT notation)')
-    parser.add_argument('--energy-slice', type=float, default=50., help='derive correction at constant theta')
-    parser.add_argument('--theta-slice', type=float, default=90., help='derive correction at constant energy')
+    parser.add_argument('-n', '--note', action='append', default=[], type=str,
+                        help='additional note to be displayed in the plots')
+    parser.add_argument('--energy-slice', type=float, default=50.,
+                        help='select energy slice for the correction derivation')
+    parser.add_argument('--theta-slice', type=float, default=90.,
+                        help='select theta slice for the correction derivation')
 
     required_arguments = parser.add_argument_group('required arguments')
     required_arguments.add_argument('-i', '--input-file', type=str, required=True, help='Input file path')
-    required_arguments.add_argument('-d', '--dependence', '--corr-dependence', type=str, required=True,
+    required_arguments.add_argument('-d', '--corr-dependence', type=str, required=True,
                                     choices=['energy', 'theta'],
                                     help='select variable on which the correction is dependent')
-    required_arguments.add_argument('-t', '--type', '--corr-type', type=str, required=True,
+    required_arguments.add_argument('-t', '--corr-type', type=str, required=True,
                                     choices=['upstream', 'downstream'], help='select correction type')
 
     args = parser.parse_args()
 
+    print('*********************************************************')
+    print('*  Calorimeter Energy Correction: Derive 1D correction  *')
+    print('*********************************************************')
+
+    if not args.note:
+        args.note.append('FCC-ee, LAr Calo')
+        args.note.append('electron')
+        if args.corr_dependence == 'energy':
+            args.note.append('#theta slice: %i deg' % (args.theta_slice))
+        if args.corr_dependence == 'theta':
+            args.note.append('E_{cluster} slice: %i GeV' % (args.energy_slice))
+        print('WARNING: Using default plot legend notes.')
+
     from ROOT import gROOT
     gROOT.SetBatch(True)
+
+    print('INFO: Loading input file from:')
+    print('      ' + args.input_file)
 
     try:
         with open(args.input_file) as results_file:
@@ -73,12 +93,16 @@ def main():
 
     param_counter = 97
     for graph_name, graph_dict in graphs:
+        graph_dict['x'], graph_dict['y'], graph_dict['y_err'] = zip(*sorted(zip(graph_dict['x'],
+                                                                                graph_dict['y'],
+                                                                                graph_dict['y_err'])))
+
         graph = TGraphErrors()
-        graph.SetName('graph_' + args.corr_type + '_' + args.corr_depenece + '_' +
+        graph.SetName('graph_' + args.corr_type + '_' + args.corr_dependence + '_' +
                       graph_name.replace('#', '').replace('{', '').replace('}', ''))
-        for i in range(len(graph_dict['x'])):
-            graph.SetPoint(i, graph_dict['x'][i], graph_dict['y'][i])
-            graph.SetPointError(i, 0., graph_dict['y_err'][i])
+        for x, y, y_err in zip(graph_dict['x'], graph_dict['y'], graph_dict['y_err']):
+            graph.SetPoint(graph.GetN(), x, y)
+            graph.SetPointError(graph.GetN() - 1, 0., y_err)
 
         graph.GetXaxis().SetTitle(graph_dict['x_label'])
         graph.GetYaxis().SetTitle(graph_dict['y_label'])
@@ -119,12 +143,12 @@ def main():
                 param_dict['func'] = args.functions[graph_dict['index']]
                 param_dict['mother_param'] = graph_name
                 param_dict['type'] = args.corr_type
-                param_dict['dependence'] = args.corr_depenece
+                param_dict['dependence'] = args.corr_dependence
                 param_dict['index'] = i
-                if args.corr_depenece == 'energy':
-                    param_dict['theta_slice'] == args.theta_slice
-                if args.corr_depenece == 'theta':
-                    param_dict['energy_slice'] == args.energy_slice
+                if args.corr_dependence == 'energy':
+                    param_dict['theta_slice'] = args.theta_slice
+                if args.corr_dependence == 'theta':
+                    param_dict['energy_slice'] = args.energy_slice
 
                 corr_params = [p for p in corr_params if not (p['name'] == param_dict['name'] and
                                                               p['type'] == param_dict['type'] and
@@ -134,7 +158,7 @@ def main():
             with open('corr_params.json', 'w') as outfile:
                 json.dump({'corr_params': corr_params}, outfile, indent=4)
 
-        plot(graph, graph.GetName())
+        plot(graph, graph.GetName(), args.note)
 
     dict_chi2 = {}
     dict_chi2['x'] = []
@@ -142,29 +166,31 @@ def main():
     for result in results:
         if result['type'] != args.corr_type:
             continue
-        if args.energy and result['theta'] != args.const_theta:
+        if args.corr_dependence == 'energy' and args.theta_slice != result['theta']:
             continue
-        if args.theta and result['momentum'] != args.const_energy:
+        if args.corr_dependence == 'theta' and args.energy_slice != result['energy']:
             continue
         if result['index'] != 0:
             continue
-        dict_chi2['x'].append(result[args.corr_depenece])
+        dict_chi2['x'].append(result[args.corr_dependence])
         dict_chi2['y'].append(result['chi2']/result['ndf'])
 
     if not dict_chi2['x']:
         return
 
-    graph_chi2 = TGraph()
-    graph_chi2.SetName('graph_' + args.corr_type + '_' + args.corr_depenece + '_chi2')
-    for i in range(len(dict_chi2['x'])):
-        graph_chi2.SetPoint(i, dict_chi2['x'][i], dict_chi2['y'][i])
+    dict_chi2['x'], dict_chi2['y'] = zip(*sorted(zip(dict_chi2['x'], dict_chi2['y'])))
 
-    if args.energy:
+    graph_chi2 = TGraph()
+    graph_chi2.SetName('graph_' + args.corr_type + '_' + args.corr_dependence + '_chi2')
+    for x, y in zip(dict_chi2['x'], dict_chi2['y']):
+        graph_chi2.SetPoint(graph_chi2.GetN(), x, y)
+
+    if args.corr_dependence == 'energy':
         graph_chi2.GetXaxis().SetTitle('E_{cluster} [GeV]')
-    if args.theta:
+    if args.corr_dependence == 'theta':
         graph_chi2.GetXaxis().SetTitle('#theta [deg]')
     graph_chi2.GetYaxis().SetTitle('#chi^{2} / NDF')
-    plot(graph_chi2, graph_chi2.GetName())
+    plot(graph_chi2, graph_chi2.GetName(), args.note)
 
 
 def plot(obj, plotname, plot_notes=[]):
@@ -184,9 +210,10 @@ def plot(obj, plotname, plot_notes=[]):
     obj.SetMarkerColor(kBlue)
     obj.SetMarkerStyle(20)
     obj.SetMarkerSize(.5)
+    obj.GetXaxis().SetTitleOffset(1.3)
+    obj.GetYaxis().SetTitleOffset(1.9)
 
-    if obj.ClassName() == 'TGraphErrors':
-        obj.SetMaximum(1.4 * max(obj.GetY()))
+    obj.SetMaximum(1.4 * max(obj.GetY()))
 
     note = TPaveText(.2, .7, .5, .9, 'brNDC')
     note.SetFillStyle(0)

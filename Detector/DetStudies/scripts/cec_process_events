@@ -31,7 +31,7 @@ def main():
     Output of this script serves as input for the `cec_derive` script.
     To run over multiple energies/angles of initial particle use for loop, e.g.:
 
-      for i in *root; do ./cec_process_events -i $i -u; done
+      for i in *root; do ./cec_process_events -i $i -t upstream; done
 
     The fit results are stored in json file named `fit_results.json`.
     '''
@@ -49,19 +49,20 @@ def main():
     parser.add_argument('--plot-file-format', type=str, default='pdf', help='plot output file format')
 
     required_arguments = parser.add_argument_group('required arguments')
-    required_arguments.add_argument('-i', '--input-file', type=str, required=True, help='Input file path')
-
-    xor_arguments = parser.add_mutually_exclusive_group(required=True)
-    xor_arguments.add_argument('-u', '--upstream', action='store_true', help='upstream material')
-    xor_arguments.add_argument('-d', '--downstream', action='store_true', help='downstream material')
-    xor_arguments.title = 'exclusive arguments'
+    required_arguments.add_argument('-i', '--input-file', type=str, required=True, help='input file path')
+    required_arguments.add_argument('-t', '--corr-type', type=str, required=True,
+                                    choices=['upstream', 'downstream'], help='select correction type')
 
     args = parser.parse_args()
 
+    print('****************************************************************')
+    print('*  Calorimeter Energy Correction: Processing generated events  *')
+    print('****************************************************************')
+
     if not args.layer_id:
-        if args.upstream:
+        if args.corr_type == 'upstream':
             args.layer_id = 0
-        else:
+        elif args.corr_type == 'downstream':
             args.layer_id = -1
         print('WARNING: Using default calorimeter layer id %i.' % args.layer_id)
 
@@ -73,11 +74,6 @@ def main():
         args.note.append('FCC-ee, LAr Calo')
         args.note.append('electron')
         print('WARNING: Using default plot legend notes.')
-
-    if args.upstream:
-        material_str = 'upstream'
-    if args.downstream:
-        material_str = 'downstream'
 
     if not os.path.isfile(args.input_file):
         print('WARNING: Input ROOT file not found!')
@@ -102,8 +98,8 @@ def main():
             args.n_bins = int(math.ceil(math.sqrt(n_events)))
     print('INFO: Number of histogram bins: %i' % args.n_bins)
 
-    hist_name = '%sEnergy__energyInLayer_%i' % (material_str, args.layer_id)
-    hist_title = ';Energy in layer id: %i [GeV];%s Energy [GeV]' % (args.layer_id, material_str.capitalize())
+    hist_name = '%sEnergy__energyInLayer_%i' % (args.corr_type, args.layer_id)
+    hist_title = ';Energy in layer id: %i [GeV];%s Energy [GeV]' % (args.layer_id, args.corr_type.capitalize())
     hist = TH2D(hist_name, hist_title, int(args.n_bins), 0., 0., int(args.n_bins), 0., 0.)
     hist.Sumw2()
     hist.SetDirectory(0)
@@ -114,9 +110,9 @@ def main():
         particle_momentum += get_momentum(event)
         particle_theta += get_theta(event)
 
-        if args.upstream:
+        if args.corr_type == 'upstream':
             cryo_energy = event.energyInCryo[1] + event.energyInCryo[4]
-        if args.downstream:
+        if args.corr_type == 'downstream':
             cryo_energy = event.energyInCryo[2] + event.energyInCryo[5]
         hist.Fill(event.energyInLayer[args.layer_id], cryo_energy)
 
@@ -133,7 +129,7 @@ def main():
     if args.rebin_factor:
         hist.Rebin(args.rebin_factor)
 
-    plot_name = '%s_vs_layer_%i_%ideg_%igev' % (material_str, args.layer_id, particle_theta, particle_momentum)
+    plot_name = '%s_vs_layer_%i_%ideg_%igev' % (args.corr_type, args.layer_id, particle_theta, particle_momentum)
     plot(hist, 'hist_' + plot_name, args)
 
     profile = hist.ProfileX('profile_x')
@@ -149,9 +145,9 @@ def main():
         args.func_to = hist.GetXaxis().GetBinUpEdge(hist.GetXaxis().GetLast())
     func = TF1('func', args.function, args.func_from, args.func_to)
     for i in range(func.GetNpar()):
-        if args.upstream:
+        if args.corr_type == 'upstream':
             func.SetParName(i, '#upsilon_{%i}' % i)
-        if args.downstream:
+        if args.corr_type == 'downstream':
             func.SetParName(i, '#delta_{%i}' % i)
 
     result = profile.Fit(func, 'SR')
@@ -179,10 +175,7 @@ def main():
         param_dict['index'] = i
         param_dict['n_params'] = func.GetNpar()
         param_dict['func'] = func.GetFormula().GetExpFormula().Data()
-        if args.upstream:
-            param_dict['type'] = 'upstream'
-        if args.downstream:
-            param_dict['type'] = 'downstream'
+        param_dict['type'] = args.corr_type
 
         results = [r for r in results if not (r['name'] == param_dict['name'] and
                                               r['type'] == param_dict['type'] and
@@ -246,8 +239,8 @@ def plot(obj, plotname, args):
         formula = func.GetFormula().GetExpFormula().Data()
         formula = formula.replace(']', '')
         formula = formula.replace('[', '')
-        formula = formula.replace(')', '')
-        formula = formula.replace('(', '')
+        if formula[0] == '(' and formula[-1] == ')':
+            formula = formula[1:-1]
         legend.AddText('Fit func.:   %s' % (formula))
         legend.GetListOfLines().Last().SetTextColor(func.GetLineColor())
 

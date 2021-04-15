@@ -11,9 +11,9 @@ def main():
     '''
     parser = argparse.ArgumentParser(description='Yay, derive up(down)stream correction parameters!')
 
-    parser.add_argument('-f', '--functions', type=str, default=[], action='append',
+    parser.add_argument('-f', '--functions', type=str, default=[], nargs='*',
                         help='fit functions (in ROOT notation)')
-    parser.add_argument('-n', '--note', action='append', default=[], type=str,
+    parser.add_argument('-n', '--notes', default=[], type=str, nargs='*',
                         help='additional note to be displayed in the plots')
     parser.add_argument('--energy-slice', type=float, default=50.,
                         help='select energy slice for the correction derivation')
@@ -34,13 +34,13 @@ def main():
     print('*  Calorimeter Energy Correction: Derive 1D correction  *')
     print('*********************************************************')
 
-    if not args.note:
-        args.note.append('FCC-ee, LAr Calo')
-        args.note.append('electron')
+    if not args.notes:
+        args.notes.append('FCC-ee, LAr Calo')
+        args.notes.append('electron')
         if args.corr_dependence == 'energy':
-            args.note.append('#theta slice: %i deg' % (args.theta_slice))
+            args.notes.append('#theta slice: %i deg' % (args.theta_slice))
         if args.corr_dependence == 'theta':
-            args.note.append('E_{cluster} slice: %i GeV' % (args.energy_slice))
+            args.notes.append('E_{cluster} slice: %i GeV' % (args.energy_slice))
         print('WARNING: Using default plot legend notes.')
 
     from ROOT import gROOT
@@ -128,7 +128,7 @@ def main():
 
             corr_params = []
             try:
-                with open('corr_params.json') as infile:
+                with open('corr_params_%s.json' % args.corr_dependence) as infile:
                     data = json.load(infile)
                     if data.get('corr_params'):
                         corr_params = data['corr_params']
@@ -155,10 +155,10 @@ def main():
                                                               p['dependence'] == param_dict['dependence'])]
                 corr_params.append(param_dict)
 
-            with open('corr_params.json', 'w') as outfile:
+            with open('corr_params_%s.json' % args.corr_dependence, 'w') as outfile:
                 json.dump({'corr_params': corr_params}, outfile, indent=4)
 
-        plot(graph, graph.GetName(), args.note)
+        plot(graph, graph.GetName(), args)
 
     dict_chi2 = {}
     dict_chi2['x'] = []
@@ -190,10 +190,10 @@ def main():
     if args.corr_dependence == 'theta':
         graph_chi2.GetXaxis().SetTitle('#theta [deg]')
     graph_chi2.GetYaxis().SetTitle('#chi^{2} / NDF')
-    plot(graph_chi2, graph_chi2.GetName(), args.note)
+    plot(graph_chi2, graph_chi2.GetName(), args)
 
 
-def plot(obj, plotname, plot_notes=[]):
+def plot(obj, plotname, args=None):
     from ROOT import gPad, gStyle
     from ROOT import TCanvas, TPaveText
     from ROOT import kBlue
@@ -215,18 +215,36 @@ def plot(obj, plotname, plot_notes=[]):
 
     obj.SetMaximum(1.4 * max(obj.GetY()))
 
-    note = TPaveText(.2, .7, .5, .9, 'brNDC')
-    note.SetFillStyle(0)
-    note.SetFillColor(0)
-    note.SetBorderSize(0)
-    note.SetTextColor(1)
-    note.SetTextFont(42)
-    note.SetTextAlign(11)
-    for note_text in plot_notes:
-        note.AddText(note_text)
+    legend = TPaveText(.2, .7, .5, .9, 'brNDC')
+    legend.SetFillStyle(0)
+    legend.SetFillColor(0)
+    legend.SetBorderSize(0)
+    legend.SetTextColor(1)
+    legend.SetTextFont(42)
+    legend.SetTextAlign(11)
+    for note_text in args.notes:
+        legend.AddText(note_text)
+
+    func = obj.GetListOfFunctions().Last()
+    if func:
+        formula = func.GetFormula().GetExpFormula().Data()
+        formula = formula.replace(']', '')
+        formula = formula.replace('[', '')
+        if formula[0] == '(' and formula[-1] == ')':
+            formula = formula[1:-1]
+        if args.corr_dependence == 'energy':
+            formula = formula.replace('x', 'E_{cluster}')
+        if args.corr_dependence == 'theta':
+            formula = formula.replace('x', '#theta')
+        legend.AddText('Fit func.:   %s' % (formula))
+        legend.GetListOfLines().Last().SetTextColor(func.GetLineColor())
 
     obj.Draw('APEL')
-    note.Draw()
+    legend.Draw()
+    if args.corr_dependence == 'energy':
+        plotname += '_%ideg' % (args.theta_slice)
+    if args.corr_dependence == 'theta':
+        plotname += '_%igev' % (args.energy_slice)
     canvas.Print(plotname + '.pdf')
 
 

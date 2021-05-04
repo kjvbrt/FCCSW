@@ -17,12 +17,6 @@
 #include "datamodel/MCParticleCollection.h"
 #include "datamodel/GenVertexCollection.h"
 
-// Root
-#include "TFile.h"
-#include "TLorentzVector.h"
-#include "TFitResult.h"
-#include "TGraphErrors.h"
-
 DECLARE_COMPONENT(CorrectCaloClusters)
 
 CorrectCaloClusters::CorrectCaloClusters(const std::string& name,
@@ -56,44 +50,73 @@ StatusCode CorrectCaloClusters::initialize() {
     }
   }
 
-  // Check if readout related parameters have the same size
+  // Check if readout related variables have the same size
   if (m_systemIDs.size() != m_readoutNames.size()) {
-    error() << "System ID array size and readout names array size does not match, exiting!" << endmsg;
+    error() << "Sizes of the systemIDs vector and readoutNames vector does not match, exiting!" << endmsg;
     return StatusCode::FAILURE;
   }
   if (m_systemIDs.size() != m_numLayers.size()) {
-    error() << "System ID array size and number of layers array size does not match, exiting!" << endmsg;
+    error() << "Sizes of systemIDs vector and numLayers vector does not match, exiting!" << endmsg;
     return StatusCode::FAILURE;
   }
   if (m_systemIDs.size() != m_firstLayerIDs.size()) {
-    error() << "System ID array size and first layer ID array size does not match, exiting!" << endmsg;
+    error() << "Sizes of systemIDs vector and firstLayerIDs vector does not match, exiting!" << endmsg;
     return StatusCode::FAILURE;
   }
   if (m_systemIDs.size() != m_samplingFractions.size()) {
-    error() << "System ID array size and sampling fractions array size does not match, exiting!" << endmsg;
+    error() << "Sizes of systemIDs vector and samplingFractions vector does not match, exiting!" << endmsg;
     return StatusCode::FAILURE;
   }
-  if (m_systemIDs.size() != m_P00.size()) {
-    error() <<  "System ID array size and P00 parameter array size does not match, exiting!" << endmsg;
+  if (m_systemIDs.size() != m_upstreamFormulas.size()) {
+    error() <<  "Sizes of systemIDs vector and upstreamFormulas vector does not match, exiting!" << endmsg;
     return StatusCode::FAILURE;
   }
-  if (m_systemIDs.size() != m_P01.size()) {
-    error() <<  "System ID array size and P01 parameter array size does not match, exiting!" << endmsg;
+  if (m_systemIDs.size() != m_upstreamParams.size()) {
+    error() <<  "Sizes of systemIDs vector and upstreamParams vector does not match, exiting!" << endmsg;
     return StatusCode::FAILURE;
   }
-  if (m_systemIDs.size() != m_P10.size()) {
-    error() <<  "System ID array size and P10 parameter array size does not match, exiting!" << endmsg;
+  if (m_systemIDs.size() != m_downstreamFormulas.size()) {
+    error() <<  "Sizes of systemIDs vector and downstreamFormulas vector does not match, exiting!" << endmsg;
     return StatusCode::FAILURE;
   }
-  if (m_systemIDs.size() != m_P11.size()) {
-    error() <<  "System ID array size and P11 parameter array size does not match, exiting!" << endmsg;
+  if (m_systemIDs.size() != m_downstreamParams.size()) {
+    error() <<  "Sizes of systemIDs vector and downstreamParams vector does not match, exiting!" << endmsg;
     return StatusCode::FAILURE;
   }
+
+  // Prepare upstream and downstream correction functions
+  initializeCorrFunctions(m_upstreamFunctions, m_upstreamFormulas, m_upstreamParams, "upstream");
+  initializeCorrFunctions(m_downstreamFunctions, m_downstreamFormulas, m_downstreamParams, "downstream");
+
+  info() << "Initialized following upstream correction functions:" << endmsg;
+  for (size_t i = 0; i < m_upstreamFunctions.size(); ++i) {
+    for (size_t j = 0; j < m_upstreamFunctions[i].size(); ++j) {
+      auto func = m_upstreamFunctions.at(i).at(j);
+      info() << "  " << func->GetName() << ": " << func->GetExpFormula() << endmsg;
+      for (int k = 0; k < func->GetNpar(); ++k) {
+        info() << "    " << func->GetParName(k) << ": " << func->GetParameter(k) << endmsg;
+      }
+    }
+  }
+
+  info() << "Initialized following downstream correction functions:" << endmsg;
+  for (size_t i = 0; i < m_downstreamFunctions.size(); ++i) {
+    for (size_t j = 0; j < m_downstreamFunctions[i].size(); ++j) {
+      auto func = m_downstreamFunctions.at(i).at(j);
+      info() << "  " << func->GetName() << ": " << func->GetExpFormula() << endmsg;
+      for (int k = 0; k < func->GetNpar(); ++k) {
+        info() << "    " << func->GetParName(k) << ": " << func->GetParameter(k) << endmsg;
+      }
+    }
+  }
+
   return StatusCode::SUCCESS;
 }
 
 
 StatusCode CorrectCaloClusters::execute() {
+  verbose() << "-------------------------------------------" << endmsg;
+
   // Get the input collection with clusters
   const fcc::CaloClusterCollection* inClusters = m_inClusters.get();
 
@@ -116,6 +139,13 @@ StatusCode CorrectCaloClusters::execute() {
     }
   }
 
+  // Apply downstream correction
+  {
+    StatusCode sc = applyDownstreamCorr(inClusters, outClusters);
+    if (sc.isFailure()) {
+      return sc;
+    }
+  }
 
   return StatusCode::SUCCESS;
 }
@@ -143,10 +173,62 @@ fcc::CaloClusterCollection* CorrectCaloClusters::initializeOutputClusters(
     verbose() << "    y: " << outCluster.core().position.y << endmsg;
     verbose() << "    z: " << outCluster.core().position.z << endmsg;
     outCluster.core().energy = inCluster.core().energy;
-    verbose() << "Cluster energy: " << outCluster.core().energy << endmsg;
   }
 
   return outClusters;
+}
+
+
+StatusCode CorrectCaloClusters::initializeCorrFunctions(std::vector<std::vector<TF1*>>& functions,
+                                                        std::vector<std::vector<std::string>> formulas,
+                                                        std::vector<std::vector<double>> parameters,
+                                                        const std::string& funcNameStem) {
+
+  for (size_t i = 0; i < formulas.size(); ++i) {
+    auto& formulaVec = formulas[i];
+    auto& paramVec = parameters[i];
+
+    bool hasY = false;
+    for (auto& formula: formulaVec) {
+      if (formula.find("y") != std::string::npos) {
+        hasY = true;
+      }
+    }
+
+    std::vector<TF1*> funcVec;
+    for (size_t j = 0; j < formulaVec.size(); ++j) {
+      std::string funcName = "func_" + m_readoutNames[i] + "_";
+      funcName += funcNameStem + "_";
+      funcName += std::to_string(j);
+      if (hasY) {
+        TF2* func = new TF2(funcName.c_str(), formulaVec.at(j).c_str(), 0., 500., 0., 180.);
+        funcVec.emplace_back(func);
+      } else {
+        TF1* func = new TF1(funcName.c_str(), formulaVec.at(j).c_str(), 0., 500.);
+        funcVec.emplace_back(func);
+      }
+    }
+
+    {
+      size_t j = 0;
+      for (auto& func: funcVec) {
+        for (int k = 0; k < func->GetNpar(); ++k) {
+          if (j >= paramVec.size()) {
+            error() << "Correction parameter vector is not long enough!" << endmsg;
+            return StatusCode::FAILURE;
+          }
+          func->SetParameter(k, paramVec.at(j));
+          std::string parName(1, 'a' + (char) j);
+          func->SetParName(k, parName.c_str());
+
+          j += 1;
+        }
+      }
+    }
+
+    functions.emplace_back(funcVec);
+  }
+  return StatusCode::SUCCESS;
 }
 
 
@@ -154,22 +236,31 @@ StatusCode CorrectCaloClusters::applyUpstreamCorr(const fcc::CaloClusterCollecti
                                                   fcc::CaloClusterCollection* outClusters) {
   for (size_t i = 0; i < m_readoutNames.size(); ++i) {
     for (size_t j = 0; j < inClusters->size(); ++j) {
-      double energyInFirstLayer = getEnergyInFirstLayer(inClusters->at(j),
-                                                        m_readoutNames[i],
-                                                        m_systemIDs[i],
-                                                        m_firstLayerIDs[i]);
-      verbose() << "Energy in first layer: " << energyInFirstLayer << endmsg;
-
-      if (energyInFirstLayer == 0.) {
+      double energyInFirstLayer = getEnergyInLayer(inClusters->at(j),
+                                                   m_readoutNames[i],
+                                                   m_systemIDs[i],
+                                                   m_firstLayerIDs[i]);
+      if (energyInFirstLayer < 0) {
+        warning() << "Energy in first calorimeter layer negative, ignoring upstream energy correction!" << endmsg;
         continue;
       }
 
-      double P0 = m_P00[i] + m_P01[i] * inClusters->at(j).energy();
-      // double P1 = m_P10[i] + m_P11[i] * inClusters->at(j).energy();
-      double P1 = m_P10[i] + m_P11[i] / std::sqrt(inClusters->at(j).energy());
-      double energyCorr = P0 + P1 * energyInFirstLayer * m_samplingFractions[i][m_firstLayerIDs[i]];
-      verbose() << "Energy correction: " << energyCorr << endmsg;
-      outClusters->at(j).core().energy += energyCorr;
+      const double clusterTheta = getClusterTheta(inClusters->at(j));
+      verbose() << "Energy in first layer: " << energyInFirstLayer << endmsg;
+      verbose() << "Cluster energy: " << inClusters->at(j).core().energy << endmsg;
+      verbose() << "Cluster theta: " << clusterTheta << endmsg;
+
+      verbose() << "Upstream correction:" << endmsg;
+      double upstreamCorr = 0.;
+      for (size_t k = 0; k < m_upstreamFunctions.at(i).size(); ++k) {
+        auto func = m_upstreamFunctions.at(i).at(k);
+        double corr = func->Eval(inClusters->at(j).core().energy, clusterTheta) * std::pow(energyInFirstLayer, k);
+        verbose() << "    upsilon_" << k << " * E_firstLayer^" << k << ": " << corr << endmsg;
+        upstreamCorr += corr;
+      }
+
+      verbose() << "    total: " << upstreamCorr << endmsg;
+      outClusters->at(j).core().energy += upstreamCorr;
       verbose() << "Corrected cluster energy: " << outClusters->at(j).core().energy << endmsg;
     }
   }
@@ -178,10 +269,47 @@ StatusCode CorrectCaloClusters::applyUpstreamCorr(const fcc::CaloClusterCollecti
 }
 
 
-double CorrectCaloClusters::getEnergyInFirstLayer(const fcc::CaloCluster& cluster,
-                                                  const std::string& readoutName,
-                                                  size_t systemID,
-                                                  size_t firstLayerID) {
+StatusCode CorrectCaloClusters::applyDownstreamCorr(const fcc::CaloClusterCollection* inClusters,
+                                                    fcc::CaloClusterCollection* outClusters) {
+  for (size_t i = 0; i < m_readoutNames.size(); ++i) {
+    for (size_t j = 0; j < inClusters->size(); ++j) {
+      double energyInLastLayer = getEnergyInLayer(inClusters->at(j),
+                                                  m_readoutNames[i],
+                                                  m_systemIDs[i],
+                                                  m_lastLayerIDs[i]);
+      if (energyInLastLayer < 0) {
+        warning() << "Energy in last calorimeter layer negative, ignoring downstream energy correction!" << endmsg;
+        continue;
+      }
+
+      const double clusterTheta = getClusterTheta(inClusters->at(j));
+      verbose() << "Energy in last layer: " << energyInLastLayer << endmsg;
+      verbose() << "Cluster energy: " << inClusters->at(j).core().energy << endmsg;
+      verbose() << "Cluster theta: " << clusterTheta << endmsg;
+
+      verbose() << "Downstream correction:" << endmsg;
+      double downstreamCorr = 0.;
+      for (size_t k = 0; k < m_downstreamFunctions.at(i).size(); ++k) {
+        auto func = m_downstreamFunctions.at(i).at(k);
+        double corr = func->Eval(inClusters->at(j).core().energy, clusterTheta) * std::pow(energyInLastLayer, k);
+        verbose() << "    delta_" << k << " * E_lastLayer^" << k << ": " << corr << endmsg;
+        downstreamCorr += corr;
+      }
+
+      verbose() << "    total: " << downstreamCorr << endmsg;
+      outClusters->at(j).core().energy += downstreamCorr;
+      verbose() << "Corrected cluster energy: " << outClusters->at(j).core().energy << endmsg;
+    }
+  }
+
+  return StatusCode::SUCCESS;
+}
+
+
+double CorrectCaloClusters::getEnergyInLayer(const fcc::CaloCluster& cluster,
+                                             const std::string& readoutName,
+                                             size_t systemID,
+                                             size_t layerID) {
   dd4hep::DDSegmentation::BitFieldCoder* decoder = m_geoSvc->lcdd()->readout(readoutName).idSpec().decoder();
 
   double energy = 0;
@@ -190,7 +318,7 @@ double CorrectCaloClusters::getEnergyInFirstLayer(const fcc::CaloCluster& cluste
     if (decoder->get(cellID, "system") != systemID) {
       continue;
     }
-    if (decoder->get(cellID, "layer") != firstLayerID) {
+    if (decoder->get(cellID, "layer") != layerID) {
       continue;
     }
 
@@ -198,4 +326,13 @@ double CorrectCaloClusters::getEnergyInFirstLayer(const fcc::CaloCluster& cluste
   }
 
   return energy;
+}
+
+
+double CorrectCaloClusters::getClusterTheta(const fcc::CaloCluster& cluster) {
+  double rxy = std::sqrt(std::pow(cluster.core().position.x, 2) + std::pow(cluster.core().position.y, 2));
+  double theta = ::fabs(std::atan2(rxy, cluster.core().position.z));
+  theta = 180 * theta / M_PI;
+
+  return theta;
 }
